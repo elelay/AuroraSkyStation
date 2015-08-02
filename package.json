@@ -1,0 +1,11 @@
+{
+ "name": "AuroraSkyStation",
+ "description": "A suite of checkers to observe Meteors",
+ "version": "0.0.1",
+ "dependencies": {
+    "esquery": "0.4.0",
+    "glob" : "5.0.14",
+    "esprima": "2.5.0",
+    "underscore": "1.8.3"
+  }
+}
