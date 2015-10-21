@@ -7,8 +7,6 @@ var _ = require("underscore");
 
 /*
  * TODO:
- *  - if function declared in client & server => lib
- *  - error if function declared elsewhere != error undefined
  *  - files in packages are parsed twice ??
  */
 
@@ -46,18 +44,85 @@ args.forEach(function(arg) {
 
 });
 
-// Meteor.Collection functions, from docs.meteor.com
-var meteorCollectionFns = {
-    "find": 2,
-    "findOne": 2,
-    "insert": 2,
-    "update": 4,
-    "upsert": 4,
-    "remove": 2,
-    "allow": 1,
-    "deny": 1,
-    "rawCollection": 0,
-    "rawDatabase": 0
+var predefPrototypes = {
+    // Mongo.Collection functions, from docs.meteor.com
+    "Mongo.Collection": {
+        _ensureIndex: 3,
+        allow: 1,
+        deny: 1,
+        insert: 2,
+        find: 2,
+        findOne: 2,
+        rawCollection: 0,
+        rawDatabase: 0,
+        remove: 2,
+        update: 4,
+        upsert: 4
+    }
+};
+
+var predefObjects = {
+    "Presences": {
+        lib: "Mongo.Collection"
+    }
+};
+
+var predefs = {
+    // docs.meteor.com
+    "Accounts": {
+        lib: {
+            _storedLoginToken: 0,
+            createUser: 2,
+            onLogin: 1
+        },
+        server: {
+            onCreateUser: 1,
+            validateNewUser: 1
+        }
+    },
+    // https://github.com/meteor-useraccounts/core/blob/master/lib/client.js
+    "AccountsTemplates": {
+        client: {
+            setState: 2
+        },
+        lib: {
+            configure: 1,
+            removeField: 1,
+            addFields: 1
+        }
+    },
+    // https://github.com/flowkey/bigscreen/
+    "BigScreen": {
+        client: {
+            exit: 0,
+            request: 4
+        }
+    },
+    // docs.meteor.com
+    "Blaze": {
+        client: {
+            getData: 1,
+            getView: 1
+        }
+    },
+    "HTTP": {
+        lib: {
+            call: 4
+        }
+    },
+    // docs.meteor.com
+    "Random": {
+        lib: {
+            fraction: 0,
+            id: 1
+        }
+    },
+    // docs.meteor.com
+    "ServiceConfiguration": {
+        lib: {
+            configurations: -1
+        }
+    }
 };
 
 var endsJS = /\.js$/;
@@ -145,8 +210,11 @@ function globalsFromJSHintrc(curDir) {
 }
 
 function addAllFns(decls, loc, name, fns) {
+    if (debug) console.log("addAllFns", name);
     _.each(fns, function(value, fnName) {
-        decls[name + "." + fnName] = {
+        var ident = name + "." + fnName;
+        if (debug) console.log("  adding", ident);
+        decls[ident] = {
             loc: loc,
             type: "function",
             arity: value
@@ -186,8 +254,6 @@ function getDeclsRefs(file, globals, decls, refs) {
             var name = getMemberFirstLevels(p.left);
             var loc = file + ":" + p.loc.start.line;
 
-            if (debug) console.log(loc, "found decl", name);
-
             var type, arity;
             if (p.right.type === "FunctionExpression") {
                 type = "function";
@@ -198,8 +264,17 @@ function getDeclsRefs(file, globals, decls, refs) {
                         arity = -1; // variable arguments
                     }
                 }
-            } else if (p.right.type === "NewExpression" && p.right.callee.type === "MemberExpression" && getMemberFirstLevels(p.right.callee) === "Meteor.Collection") {
-                addAllFns(decls, loc, name, meteorCollectionFns);
+                if (debug) console.log(loc, "found decl", name + "(" + arity + ")");
+            } else if (p.right.type === "NewExpression" && p.right.callee.type === "MemberExpression") {
+                var typ = getMemberFirstLevels(p.right.callee);
+                if (debug) console.log(loc, "found decl", name, "= new", typ);
+                if ((typ === "Mongo.Collection") || (typ === "Meteor.Collection")) {
+                    addAllFns(decls, loc, name, predefPrototypes["Mongo.Collection"]);
+                } else {
+                    if (debug) console.log("new", typ);
+                }
+            } else {
+                if (debug) console.log(loc, "found decl", name);
             }
 
             decls[name] = {
@@ -312,7 +387,66 @@ getRefDecls("lib", libFiles, libDecls, libRefs);
 getRefDecls("server", serverFiles, serverDecls, serverRefs);
 getRefDecls("client", clientFiles, clientDecls, clientRefs);
 
-function checkRefs(declsA, refs) {
+_.each(predefObjects, function(predefObject, predefObjectName) {
+    predefs[predefObjectName] = {};
+    _.each(predefObject, function(protoName, domain) {
+        var proto = predefPrototypes[protoName];
+        predefs[predefObjectName][domain] = {};
+        _.each(proto, function(arity, funName) {
+            predefs[predefObjectName][domain][funName] = arity;
+        });
+    });
+});
+
+_.each(predefs, function(predef, globName) {
+
+    function addPredef(decls, predefDecls) {
+        _.each(predefDecls, function(arity, name) {
+            var ident = globName + "." + name;
+            if (!decls[ident]) {
+                decls[ident] = {
+                    loc: "<<" + globName + ">>",
+                    type: (arity >= 0) ? "function" : "",
+                    arity: arity
+                };
+            }
+        });
+    }
+
+    if (predef.lib) {
+        addPredef(libDecls, predef.lib);
+    }
+    if (predef.client) {
+        addPredef(clientDecls, predef.client);
+    }
+    if (predef.server) {
+        addPredef(serverDecls, predef.server);
+    }
+});
+
+_.each(serverDecls, function(decl, name) {
+    var other = clientDecls[name];
+    if (other) {
+        if ((other.type !== decl.type) ||
+            (other.arity !== decl.arity)) {
+            if (reportClientServerDiscrepancy) {
+                process.stderr.write(decl.loc + "\t" + name + " is " + decl.type + "(" + decl.arity + ") in server and " + other.type + "(" + other.arity + ") in client\n");
+                process.stderr.write(other.loc + "\t" + name + " is " + decl.type + "(" + decl.arity + ") in server and " + other.type + "(" + other.arity + ") in client\n");
+            }
+        } else if (libDecls[name]) {
+            if (reportClientServerDiscrepancy) {
+                process.stderr.write(decl.loc + "\t" + name + "(" + decl.arity + ") in server and client shadows lib\n");
+                process.stderr.write(other.loc + "\t" + name + "(" + decl.arity + ") in server and client shadows lib\n");
+                process.stderr.write(libDecls[name].loc + "\t" + name + "(" + decl.arity + ") in server and client shadows lib\n");
+            }
+        } else {
+            if (verbose) console.log(name + "(" + decl.arity + ") in server and client => putting in lib\n");
+            libDecls[name] = decl;
+        }
+    }
+});
+
+function checkRefs(myDomain, declsA, errorDeclsA, refs) {
     refs.forEach(function(ref) {
         var decls = _.find(declsA, function(decls) {
             return decls.hasOwnProperty(ref.name);
@@ -323,11 +457,27 @@ function checkRefs(declsA, refs) {
                 process.stderr.write(ref.loc + "\tcalled " + ref.name + "(" + decl.arity + ") with " + ref.arity + " parameters\n");
             }
         } else {
-            process.stderr.write(ref.loc + "\treference to undefined '" + ref.name + "'\n");
+            var found = false;
+            _.each(errorDeclsA, function(decls, domain) {
+                if (decls[ref.name]) {
+                    process.stderr.write(ref.loc + "\treference to '" + ref.name + "' defined in " + domain + " from " + myDomain + "\n");
+                    found = true;
+                }
+            });
+            if (!found) {
+                process.stderr.write(ref.loc + "\treference to undefined '" + ref.name + "'\n");
+            }
         }
     });
 }
 
-checkRefs([libDecls], libRefs);
-checkRefs([libDecls, serverDecls], serverRefs);
-checkRefs([libDecls, clientDecls], clientRefs);
+checkRefs("lib", [libDecls], {
+    client: clientDecls,
+    server: serverDecls
+}, libRefs);
+checkRefs("server", [libDecls, serverDecls], {
+    client: clientDecls
+}, serverRefs);
+checkRefs("client", [libDecls, clientDecls], {
+    server: serverDecls
+}, clientRefs);
