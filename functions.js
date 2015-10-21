@@ -1,10 +1,16 @@
+"use strict";
 var Esq = require("esquery");
-var Glob = require("glob");
 var Parse = require("esprima").parse;
 var Fs = require("fs");
 var Path = require("path");
 var _ = require("underscore");
-var Join = Path.join;
+
+/*
+ * TODO:
+ *  - if function declared in client & server => lib
+ *  - error if function declared elsewhere != error undefined
+ *  - files in packages are parsed twice ??
+ */
 
 var usage =
     "Usage: node " + process.argv[1] + " [-v/--verbose] [-d/--debug] [DIR]\n" +
@@ -40,6 +46,21 @@ args.forEach(function(arg) {
 
 });
 
+// Meteor.Collection functions, from docs.meteor.com
+var meteorCollectionFns = {
+    "find": 2,
+    "findOne": 2,
+    "insert": 2,
+    "update": 4,
+    "upsert": 4,
+    "remove": 2,
+    "allow": 1,
+    "deny": 1,
+    "rawCollection": 0,
+    "rawDatabase": 0
+};
+
+var endsJS = /\.js$/;
 
 var libFiles = [],
     serverFiles = [],
@@ -48,7 +69,7 @@ var libFiles = [],
 
 function ignoreFile(file, filePath) {
     return file.indexOf(".") === 0 ||
-        (filePath === "package.js" || filePath === "packages.json" ||  filePath === "README.md");
+        (filePath === "package.js" || filePath === "packages.json" || filePath === "README.md" || filePath === "README");
 }
 
 function tree(root, dir, accs, acc) {
@@ -90,7 +111,7 @@ function tree(root, dir, accs, acc) {
 
                 } else if (acc) {
                     acc.push(p);
-                } else {
+                } else if (relP.match(endsJS)) {
                     throw new Error("file not in lib, client or server: '" + relP + "'");
                 }
             }
@@ -123,20 +144,37 @@ function globalsFromJSHintrc(curDir) {
     }
 }
 
+function addAllFns(decls, loc, name, fns) {
+    _.each(fns, function(value, fnName) {
+        decls[name + "." + fnName] = {
+            loc: loc,
+            type: "function",
+            arity: value
+        };
+    });
+}
+
 function getMemberFirstLevels(memberExpr) {
-    if (memberExpr.object.type === "MemberExpression") {
-        return getMemberFirstLevels(memberExpr.object);
-    } else if (memberExpr.object.type === "Identifier") {
-        return memberExpr.object.name + "." + memberExpr.property.name;
+    if (memberExpr.type === "Identifier") {
+        return memberExpr.name;
     } else {
-        console.error("E: unexpected identifier:", memberExpr);
-        process.exit(1);
+        if (memberExpr.object.type === "MemberExpression") {
+            return getMemberFirstLevels(memberExpr.object);
+        } else if (memberExpr.object.type === "Identifier") {
+            return memberExpr.object.name + "." + memberExpr.property.name;
+        } else {
+            console.error("E: unexpected identifier:", memberExpr);
+            process.exit(1);
+        }
     }
 }
 
+function isInterestingId(globals, member) {
+    return member.type === "Identifier" && (!globals || globals[member.name]);
+}
+
 function isInterestingIdentifier(globals, memberExpr) {
-    return (memberExpr.type === "MemberExpression") &&
-        ((memberExpr.object.type === "Identifier" && (!globals || globals[memberExpr.object.name])) || isInterestingIdentifier(globals, memberExpr.object));
+    return isInterestingId(globals, memberExpr) || (memberExpr.type === "MemberExpression" && isInterestingIdentifier(globals, memberExpr.object));
 }
 
 function getDeclsRefs(file, globals, decls, refs) {
@@ -146,15 +184,24 @@ function getDeclsRefs(file, globals, decls, refs) {
     declsAST.forEach(function(p) {
         if (isInterestingIdentifier(globals, p.left)) {
             var name = getMemberFirstLevels(p.left);
-            var loc = file + ":" + p.loc.start.line
+            var loc = file + ":" + p.loc.start.line;
 
             if (debug) console.log(loc, "found decl", name);
 
             var type, arity;
             if (p.right.type === "FunctionExpression") {
                 type = "function";
-                arity = p.right.params.length
+                arity = p.right.params.length;
+                if (arity === 0) {
+                    var usesArguments = Esq.query(p.right, "[type='Identifier'][name='arguments']");
+                    if (usesArguments) {
+                        arity = -1; // variable arguments
+                    }
+                }
+            } else if (p.right.type === "NewExpression" && p.right.callee.type === "MemberExpression" && getMemberFirstLevels(p.right.callee) === "Meteor.Collection") {
+                addAllFns(decls, loc, name, meteorCollectionFns);
             }
+
             decls[name] = {
                 loc: loc,
                 type: type,
@@ -167,7 +214,7 @@ function getDeclsRefs(file, globals, decls, refs) {
     refsAST.forEach(function(p) {
         if (isInterestingIdentifier(globals, p.callee)) {
             var name = getMemberFirstLevels(p.callee);
-            var loc = file + ":" + p.loc.start.line
+            var loc = file + ":" + p.loc.start.line;
 
             if (debug) console.log(loc, "found ref", name);
 
@@ -191,7 +238,9 @@ process.stdout.write("Scanning " + curDir + "...\n");
 
 var globals = globalsFromJSHintrc(curDir);
 
-
+// FIXME: extract functions list in
+delete globals["BrowserPolicy"];
+delete globals["DDP"];
 delete globals["Meteor"];
 delete globals["Cluster"];
 delete globals["Tracker"];
@@ -201,14 +250,12 @@ delete globals["Fs"];
 delete globals["Logger"];
 delete globals["Router"];
 delete globals["Session"];
+delete globals["Template"];
+delete globals["UI"];
 
-var globOptions = {
-    cwd: curDir
-};
 var parseOptions = {
     loc: true
 };
-
 
 tree(curDir, curDir, {
     lib: libFiles,
@@ -229,6 +276,15 @@ if (Fs.existsSync(packages)) {
     }, undefined);
 }
 
+// FIXME: as long as duplicate files in packages
+libFiles.sort();
+serverFiles.sort();
+clientFiles.sort();
+
+libFiles = _.uniq(libFiles, true);
+serverFiles = _.uniq(serverFiles, true);
+clientFiles = _.uniq(clientFiles, true);
+
 var libDecls = [],
     libRefs = [];
 var serverDecls = [],
@@ -239,7 +295,6 @@ var clientDecls = [],
 if (debug) console.log("libFiles:", libFiles);
 if (debug) console.log("serverFiles:", serverFiles);
 
-var endsJS = /\.js$/;
 
 function getRefDecls(type, files, decls, refs) {
 
@@ -264,7 +319,7 @@ function checkRefs(declsA, refs) {
         });
         var decl = decls && decls[ref.name];
         if (decl) {
-            if (decl.arity < ref.arity) {
+            if (decl.arity >= 0 && decl.arity < ref.arity) {
                 process.stderr.write(ref.loc + "\tcalled " + ref.name + "(" + decl.arity + ") with " + ref.arity + " parameters\n");
             }
         } else {
