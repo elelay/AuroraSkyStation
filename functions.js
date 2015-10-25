@@ -15,11 +15,14 @@ var usage =
     "\n" +
     "    -v, --verbose    be more verbose\n" +
     "    -d, --debug      debug messages\n" +
+    "    -p, --pedantic   more warnings\n" +
     "    [DIR]            directory to scan\n" +
     "\n";
 
 var debug = false;
 var verbose = false;
+var reportClientServerDiscrepancy = false;
+var reportRedefinitions = false;
 var curDir;
 
 var args = process.argv.slice();
@@ -34,6 +37,9 @@ args.forEach(function(arg) {
         verbose = true;
     } else if (!curDir) {
         curDir = arg;
+    } else if (arg.match(/^--?p(edantic)?$/)) {
+        reportClientServerDiscrepancy = true;
+        reportRedefinitions = true;
     } else if (arg.match(/^--?h(elp)?$/)) {
         process.stdout.write(usage);
         process.exit(0);
@@ -102,12 +108,16 @@ var predefs = {
     "Blaze": {
         client: {
             getData: 1,
-            getView: 1
+            getView: 2
         }
     },
     "HTTP": {
         lib: {
-            call: 4
+            call: 4,
+            del: 3,
+            get: 3,
+            post: 3,
+            put: 3
         }
     },
     // docs.meteor.com
@@ -131,6 +141,46 @@ var libFiles = [],
     serverFiles = [],
     clientFiles = [],
     testsFiles = [];
+
+var errorCounters = {
+    "I": {
+        _cnt: 0
+    },
+    "W": {
+        _cnt: 0
+    },
+    "E": {
+        _cnt: 0
+    },
+    _cnt: 0
+};
+
+function reportError(level, id, locOrLocMessage, message) {
+    errorCounters._cnt++;
+    errorCounters[level]._cnt++;
+    errorCounters[level][id] = (errorCounters[level][id] || 0) + 1;
+
+    if (message) {
+        process.stderr.write(locOrLocMessage + "\t" + level + ": " + message + "\n");
+    } else if (typeof locOrLocMessage === "Array") {
+        locOrLocMessage.forEach(function(lm) {
+            process.stderr.write(lm[0] + "\t" + level + ": " + lm[1] + "\n");
+        });
+    }
+}
+
+function info(id, loc, message) {
+    reportError("I", id, loc, message);
+}
+
+function warn(id, loc, message) {
+    reportError("W", id, loc, message);
+}
+
+function error(id, loc, message) {
+    reportError("E", id, loc, message);
+}
+
 
 function ignoreFile(file, filePath) {
     return file.indexOf(".") === 0 ||
@@ -275,6 +325,18 @@ function getDeclsRefs(file, globals, decls, refs) {
                 }
             } else {
                 if (debug) console.log(loc, "found decl", name);
+            }
+
+            if (reportRedefinitions && decls[name]) {
+                var other = decls[name];
+                info("redef", [
+                    [
+                        loc, name + "(" + arity + ") already declared"
+                    ],
+                    [
+                        other.loc, name + "(" + other.arity + ") first declared there"
+                    ]
+                ]);
             }
 
             decls[name] = {
@@ -430,19 +492,23 @@ _.each(serverDecls, function(decl, name) {
         if ((other.type !== decl.type) ||
             (other.arity !== decl.arity)) {
             if (reportClientServerDiscrepancy) {
-                process.stderr.write(decl.loc + "\t" + name + " is " + decl.type + "(" + decl.arity + ") in server and " + other.type + "(" + other.arity + ") in client\n");
-                process.stderr.write(other.loc + "\t" + name + " is " + decl.type + "(" + decl.arity + ") in server and " + other.type + "(" + other.arity + ") in client\n");
+                warn("client-server-discrepancy-arity", [
+                    [decl.loc, name + " is " + decl.type + "(" + decl.arity + ") in server and " + other.type + "(" + other.arity + ") in client"],
+                    [other.loc, name + " is " + decl.type + "(" + decl.arity + ") in server and " + other.type + "(" + other.arity + ") in client"]
+                ]);
             }
         } else if (libDecls[name]) {
             if (reportClientServerDiscrepancy) {
-                process.stderr.write(decl.loc + "\t" + name + "(" + decl.arity + ") in server and client shadows lib\n");
-                process.stderr.write(other.loc + "\t" + name + "(" + decl.arity + ") in server and client shadows lib\n");
-                process.stderr.write(libDecls[name].loc + "\t" + name + "(" + decl.arity + ") in server and client shadows lib\n");
+                warn("client-server-shadows-lib", [
+                    [decl.loc, name + "(" + decl.arity + ") in server and client shadows lib"],
+                    [other.loc, name + "(" + decl.arity + ") in server and client shadows lib"],
+                    [libDecls[name].loc, name + "(" + decl.arity + ") in server and client shadows lib"]
+                ]);
             }
-        } else {
-            if (verbose) console.log(name + "(" + decl.arity + ") in server and client => putting in lib\n");
-            libDecls[name] = decl;
         }
+
+        if (verbose) console.log(name + "(" + decl.arity + ") in server and client => putting in lib\n");
+        libDecls[name] = decl;
     }
 });
 
@@ -454,18 +520,18 @@ function checkRefs(myDomain, declsA, errorDeclsA, refs) {
         var decl = decls && decls[ref.name];
         if (decl) {
             if (decl.arity >= 0 && decl.arity < ref.arity) {
-                process.stderr.write(ref.loc + "\tcalled " + ref.name + "(" + decl.arity + ") with " + ref.arity + " parameters\n");
+                error("ref-arity", ref.loc, "called " + ref.name + "(" + decl.arity + ") with " + ref.arity + " parameters");
             }
         } else {
             var found = false;
             _.each(errorDeclsA, function(decls, domain) {
                 if (decls[ref.name]) {
-                    process.stderr.write(ref.loc + "\treference to '" + ref.name + "' defined in " + domain + " from " + myDomain + "\n");
+                    error("ref-domain", ref.loc, "reference to '" + ref.name + "' defined in " + domain + " from " + myDomain);
                     found = true;
                 }
             });
             if (!found) {
-                process.stderr.write(ref.loc + "\treference to undefined '" + ref.name + "'\n");
+                error("ref-undefined", ref.loc, "reference to undefined '" + ref.name + "'");
             }
         }
     });
@@ -481,3 +547,26 @@ checkRefs("server", [libDecls, serverDecls], {
 checkRefs("client", [libDecls, clientDecls], {
     server: serverDecls
 }, clientRefs);
+
+
+var maxLen = Math.floor(Math.log10(errorCounters._cnt || 1)) + 1;
+
+function padRight(v) {
+    var len = Math.floor(Math.log10(v || 1)) + 1;
+    var res = "";
+    for (var i = len; i < maxLen; i++) {
+        res += " ";
+    }
+    return res + v;
+}
+process.stderr.write(" =================================================\n");
+process.stderr.write(" " + padRight(errorCounters._cnt) + " messages\n");
+_.each(errorCounters, function(idC, level) {
+    if (level === "_cnt") return;
+
+    process.stderr.write(" " + padRight(idC._cnt) + " " + level + "\n");
+    _.each(idC, function(c, id) {
+        if (id === "_cnt") return;
+        process.stderr.write(" " + padRight(c) + " " + id + "\n");
+    });
+});
