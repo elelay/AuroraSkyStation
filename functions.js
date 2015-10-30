@@ -429,9 +429,6 @@ var serverDecls = [],
 var clientDecls = [],
     clientRefs = [];
 
-if (debug) console.log("libFiles:", libFiles);
-if (debug) console.log("serverFiles:", serverFiles);
-
 
 function getRefDecls(type, files, decls, refs) {
 
@@ -443,6 +440,65 @@ function getRefDecls(type, files, decls, refs) {
     // if(debug)console.log(type + "Decls:", decls);
     // if(debug)console.log(type + "Refs:", refs);
 }
+
+function getPackageDir(name) {
+    var yname = name.match(/my:(.+)/);
+    if (yname) {
+        var n = yname[1];
+        var packageDir = Path.resolve(curDir, "../" + n);
+        if (Fs.existsSync(packageDir)) {
+            return packageDir;
+        } else {
+            if (debug) console.log("getPackageDir couldn't find", name, "(not in", packageDir, ")");
+        }
+    } else {
+        if (debug) console.log("getPackageDir no rule for", name);
+    }
+}
+
+function treePackageJS(curDir) {
+    var packageJS = Path.join(curDir, "package.js");
+    if (Fs.existsSync(packageJS)) {
+        if (verbose) console.log("following", packageJS);
+
+        var ast = Parse(Fs.readFileSync(packageJS), parseOptions);
+        var uses = Esq.query(ast, "CallExpression");
+        uses.forEach(function(p) {
+            var isApiUse = (p.callee.type === "MemberExpression") &&
+                p.callee.object && (p.callee.object.name === "api") &&
+                p.callee.property && (p.callee.property.name === "use") &&
+                (p.arguments.length === 1 || p.arguments.length === 2);
+            if (isApiUse) {
+                var packages = [];
+                if (p.arguments[0].type === "ArrayExpression") {
+                    packages = p.arguments[0].elements.map(function(elt) {
+                        return elt.value;
+                    });
+                }
+                packages.forEach(function(name) {
+                    var packageDir = getPackageDir(name);
+                    if (debug) console.log("package", name, "=>", packageDir);
+                    if (packageDir) {
+                        tree(packageDir, packageDir, {
+                            lib: libFiles,
+                            client: clientFiles,
+                            server: serverFiles,
+                            tests: testsFiles
+                        }, undefined);
+
+                        treePackageJS(packageDir);
+                    }
+                });
+            }
+        });
+
+    }
+}
+
+treePackageJS(curDir);
+
+if (debug) console.log("libFiles:", libFiles);
+if (debug) console.log("serverFiles:", serverFiles);
 
 
 getRefDecls("lib", libFiles, libDecls, libRefs);
