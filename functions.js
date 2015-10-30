@@ -35,14 +35,14 @@ args.forEach(function(arg) {
     } else if (arg.match(/^--?d(ebug)?$/)) {
         debug = true;
         verbose = true;
-    } else if (!curDir) {
-        curDir = arg;
     } else if (arg.match(/^--?p(edantic)?$/)) {
         reportClientServerDiscrepancy = true;
         reportRedefinitions = true;
     } else if (arg.match(/^--?h(elp)?$/)) {
         process.stdout.write(usage);
         process.exit(0);
+    } else if (!curDir) {
+        curDir = arg;
     } else {
         process.stderr.write(usage);
         process.exit(-1);
@@ -162,7 +162,7 @@ function reportError(level, id, locOrLocMessage, message) {
 
     if (message) {
         process.stderr.write(locOrLocMessage + "\t" + level + ": " + message + "\n");
-    } else if (typeof locOrLocMessage === "Array") {
+    } else {
         locOrLocMessage.forEach(function(lm) {
             process.stderr.write(lm[0] + "\t" + level + ": " + lm[1] + "\n");
         });
