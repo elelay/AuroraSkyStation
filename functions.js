@@ -63,7 +63,9 @@ var predefPrototypes = {
         rawDatabase: 0,
         remove: 2,
         update: 4,
-        upsert: 4
+        upsert: 4,
+        // https://github.com/meteorhacks/meteor-aggregate
+        aggregate: 2
     }
 };
 
@@ -80,6 +82,9 @@ var predefs = {
             _storedLoginToken: 0,
             createUser: 2,
             onLogin: 1
+        },
+        client: {
+            ui: -1
         },
         server: {
             onCreateUser: 1,
@@ -131,6 +136,37 @@ var predefs = {
     "ServiceConfiguration": {
         lib: {
             configurations: -1
+        }
+    },
+    // https://github.com/TAPevents/tap-i18n/
+    "TAPi18n": {
+        client: {
+            getLanguage: 0,
+            setLanguage: 1,
+        },
+        lib: {
+            "__": 3,
+            getLanguages: 0,
+            loadTranslations: 2
+        }
+    },
+    // https://github.com/softwarerero/meteor-accounts-t9n
+    "T9n": {
+        lib: {
+            get: 3,
+            map: 2,
+            setLanguage: 1
+        }
+    },
+    // https://github.com/percolatestudio/publish-counts
+    "Counts": {
+        client: {
+            get: 1,
+            has: 1
+        },
+        server: {
+            publish: 4,
+            noWarnings: 0
         }
     }
 };
@@ -310,7 +346,7 @@ function getDeclsRefs(file, globals, decls, refs) {
                 arity = p.right.params.length;
                 if (arity === 0) {
                     var usesArguments = Esq.query(p.right, "[type='Identifier'][name='arguments']");
-                    if (usesArguments) {
+                    if (usesArguments.length) {
                         arity = -1; // variable arguments
                     }
                 }
@@ -374,21 +410,6 @@ if (!curDir) {
 process.stdout.write("Scanning " + curDir + "...\n");
 
 var globals = globalsFromJSHintrc(curDir);
-
-// FIXME: extract functions list in
-delete globals["BrowserPolicy"];
-delete globals["DDP"];
-delete globals["Meteor"];
-delete globals["Cluster"];
-delete globals["Tracker"];
-delete globals["Npm"];
-delete globals["_"];
-delete globals["Fs"];
-delete globals["Logger"];
-delete globals["Router"];
-delete globals["Session"];
-delete globals["Template"];
-delete globals["UI"];
 
 var parseOptions = {
     loc: true
