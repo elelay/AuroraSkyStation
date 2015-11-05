@@ -327,8 +327,11 @@ function isInterestingId(globals, member) {
     return member.type === "Identifier" && (!globals || globals[member.name]);
 }
 
-function isInterestingIdentifier(globals, memberExpr) {
-    return isInterestingId(globals, memberExpr) || (memberExpr.type === "MemberExpression" && isInterestingIdentifier(globals, memberExpr.object));
+function isInterestingIdentifier(globals, memberExpr, level) {
+    return isInterestingId(globals, memberExpr) ||
+        (memberExpr.type === "MemberExpression" &&
+            level != 1 &&
+            isInterestingIdentifier(globals, memberExpr.object, level - 1));
 }
 
 function getDeclsRefs(file, globals, decls, refs) {
@@ -336,7 +339,7 @@ function getDeclsRefs(file, globals, decls, refs) {
     var ast = Parse(Fs.readFileSync(file), parseOptions);
     var declsAST = Esq.query(ast, "AssignmentExpression");
     declsAST.forEach(function(p) {
-        if (isInterestingIdentifier(globals, p.left)) {
+        if (isInterestingIdentifier(globals, p.left, 2)) { // limit decls to 2 levels
             var name = getMemberFirstLevels(p.left);
             var loc = file + ":" + p.loc.start.line;
 
@@ -385,7 +388,7 @@ function getDeclsRefs(file, globals, decls, refs) {
 
     var refsAST = Esq.query(ast, "CallExpression");
     refsAST.forEach(function(p) {
-        if (isInterestingIdentifier(globals, p.callee)) {
+        if (isInterestingIdentifier(globals, p.callee, 0)) { // no level limit for refs
             var name = getMemberFirstLevels(p.callee);
             var loc = file + ":" + p.loc.start.line;
 
