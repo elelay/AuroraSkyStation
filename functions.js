@@ -11,7 +11,7 @@ var _ = require("underscore");
  */
 
 var usage =
-    "Usage: node " + process.argv[1] + " [-v/--verbose] [-d/--debug] [DIR]\n" +
+    "Usage: node " + process.argv[1] + " [-v/--verbose] [-d/--debug] [-p/--pedantic] [DIR]\n" +
     "\n" +
     "    -v, --verbose    be more verbose\n" +
     "    -d, --debug      debug messages\n" +
