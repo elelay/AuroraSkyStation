@@ -1,6 +1,6 @@
 "use strict";
 var Esq = require("esquery");
-var Parse = require("esprima").parse;
+var Esprima = require("esprima");
 var Fs = require("fs");
 var Path = require("path");
 var _ = require("underscore");
@@ -191,6 +191,10 @@ var errorCounters = {
     _cnt: 0
 };
 
+var parseOptions = {
+    loc: true
+};
+
 function reportError(level, id, locOrLocMessage, message) {
     errorCounters._cnt++;
     errorCounters[level]._cnt++;
@@ -330,7 +334,7 @@ function isInterestingId(globals, member) {
 function isInterestingIdentifier(globals, memberExpr, level) {
     return isInterestingId(globals, memberExpr) ||
         (memberExpr.type === "MemberExpression" &&
-            level != 1 &&
+            level !== 1 &&
             isInterestingIdentifier(globals, memberExpr.object, level - 1));
 }
 
@@ -357,7 +361,7 @@ function addDeclsForName(file, loc, name, value, decls) {
             if (debug) console.log("new", typ);
         }
     } else if (value.type === "ObjectExpression") {
-		if (debug) console.log(loc, "found decl", nameCompo + ": Object");
+		if (debug) console.log(loc, "found decl", name + ": Object");
         value.properties.forEach(function(prop) {
             if (prop.key.type === "Identifier") {
                 var nameCompo = name + "." + prop.key.name;
@@ -425,7 +429,7 @@ function getRefs(file, ast, globals, refs) {
 
 function getDeclsRefs(file, globals, decls, refs) {
     if (verbose) console.log("reading " + file);
-    var ast = Parse(Fs.readFileSync(file), parseOptions);
+    var ast = Esprima.parse(Fs.readFileSync(file), parseOptions);
 
     getDecls(file, ast, globals, decls);
     getRefs(file, ast, globals, refs);
@@ -439,10 +443,6 @@ if (!curDir) {
 process.stdout.write("Scanning " + curDir + "...\n");
 
 var globals = globalsFromJSHintrc(curDir);
-
-var parseOptions = {
-    loc: true
-};
 
 tree(curDir, curDir, {
     lib: libFiles,
@@ -511,7 +511,7 @@ function treePackageJS(curDir) {
     if (Fs.existsSync(packageJS)) {
         if (verbose) console.log("following", packageJS);
 
-        var ast = Parse(Fs.readFileSync(packageJS), parseOptions);
+        var ast = Esprima.parse(Fs.readFileSync(packageJS), parseOptions);
         var uses = Esq.query(ast, "CallExpression");
         uses.forEach(function(p) {
             var isApiUse = (p.callee.type === "MemberExpression") &&
