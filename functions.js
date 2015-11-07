@@ -334,58 +334,76 @@ function isInterestingIdentifier(globals, memberExpr, level) {
             isInterestingIdentifier(globals, memberExpr.object, level - 1));
 }
 
-function getDeclsRefs(file, globals, decls, refs) {
-    if (verbose) console.log("reading " + file);
-    var ast = Parse(Fs.readFileSync(file), parseOptions);
+function addDeclsForName(file, loc, name, value, decls) {
+    var type, arity;
+
+    if (value.type === "FunctionExpression") {
+        type = "function";
+        arity = value.params.length;
+        if (arity === 0) {
+            var usesArguments = Esq.query(value, "[type='Identifier'][name='arguments']");
+            if (usesArguments.length) {
+                arity = -1; // variable arguments
+            }
+        }
+        if (debug) console.log(loc, "found decl", name + "(" + arity + ")");
+    } else if (value.type === "NewExpression" && value.callee.type === "MemberExpression") {
+        var typ = getMemberFirstLevels(value.callee);
+        if (debug) console.log(loc, "found decl", name, "= new", typ);
+        if ((typ === "Mongo.Collection") || (typ === "Meteor.Collection")) {
+            addAllFns(decls, loc, name, predefPrototypes["Mongo.Collection"]);
+            return;
+        } else {
+            if (debug) console.log("new", typ);
+        }
+    } else if (value.type === "ObjectExpression") {
+		if (debug) console.log(loc, "found decl", nameCompo + ": Object");
+        value.properties.forEach(function(prop) {
+            if (prop.key.type === "Identifier") {
+                var nameCompo = name + "." + prop.key.name;
+                var loc = file + ":" + prop.loc.start.line;
+                addDeclsForName(file, loc, nameCompo, prop.value, decls);
+            } else {
+                if (debug) console.log("object unsupported key", prop.key);
+            }
+        });
+        return;
+    } else {
+        if (debug) console.log(loc, "found decl", name);
+    }
+
+    if (reportRedefinitions && decls[name]) {
+        var other = decls[name];
+        info("redef", [
+            [
+                loc, name + "(" + arity + ") already declared"
+            ],
+            [
+                other.loc, name + "(" + other.arity + ") first declared there"
+            ]
+        ]);
+    }
+
+    decls[name] = {
+        loc: loc,
+        type: type,
+        arity: arity
+    };
+}
+
+function getDecls(file, ast, globals, decls) {
     var declsAST = Esq.query(ast, "AssignmentExpression");
     declsAST.forEach(function(p) {
         if (isInterestingIdentifier(globals, p.left, 2)) { // limit decls to 2 levels
             var name = getMemberFirstLevels(p.left);
             var loc = file + ":" + p.loc.start.line;
 
-            var type, arity;
-            if (p.right.type === "FunctionExpression") {
-                type = "function";
-                arity = p.right.params.length;
-                if (arity === 0) {
-                    var usesArguments = Esq.query(p.right, "[type='Identifier'][name='arguments']");
-                    if (usesArguments.length) {
-                        arity = -1; // variable arguments
-                    }
-                }
-                if (debug) console.log(loc, "found decl", name + "(" + arity + ")");
-            } else if (p.right.type === "NewExpression" && p.right.callee.type === "MemberExpression") {
-                var typ = getMemberFirstLevels(p.right.callee);
-                if (debug) console.log(loc, "found decl", name, "= new", typ);
-                if ((typ === "Mongo.Collection") || (typ === "Meteor.Collection")) {
-                    addAllFns(decls, loc, name, predefPrototypes["Mongo.Collection"]);
-                } else {
-                    if (debug) console.log("new", typ);
-                }
-            } else {
-                if (debug) console.log(loc, "found decl", name);
-            }
-
-            if (reportRedefinitions && decls[name]) {
-                var other = decls[name];
-                info("redef", [
-                    [
-                        loc, name + "(" + arity + ") already declared"
-                    ],
-                    [
-                        other.loc, name + "(" + other.arity + ") first declared there"
-                    ]
-                ]);
-            }
-
-            decls[name] = {
-                loc: loc,
-                type: type,
-                arity: arity
-            };
+            addDeclsForName(file, loc, name, p.right, decls);
         }
     });
+}
 
+function getRefs(file, ast, globals, refs) {
     var refsAST = Esq.query(ast, "CallExpression");
     refsAST.forEach(function(p) {
         if (isInterestingIdentifier(globals, p.callee, 0)) { // no level limit for refs
@@ -403,6 +421,14 @@ function getDeclsRefs(file, globals, decls, refs) {
             });
         }
     });
+}
+
+function getDeclsRefs(file, globals, decls, refs) {
+    if (verbose) console.log("reading " + file);
+    var ast = Parse(Fs.readFileSync(file), parseOptions);
+
+    getDecls(file, ast, globals, decls);
+    getRefs(file, ast, globals, refs);
 }
 
 
