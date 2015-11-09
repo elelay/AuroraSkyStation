@@ -637,11 +637,12 @@ function addDeclsForName(file, loc, name, value, decls) {
             }
         }
         if (debug) console.log(loc, "found decl", name + "(" + arity + ")");
-    } else if (value.type === "NewExpression" && value.callee.type === "MemberExpression") {
+    } else if (value.type === "NewExpression" &&
+        (value.callee.type === "MemberExpression" || value.callee.type === "Identifier")) {
         var typ = getMemberFirstLevels(value.callee);
         if (debug) console.log(loc, "found decl", name, "= new", typ);
-        if ((typ === "Mongo.Collection") || (typ === "Meteor.Collection")) {
-            addAllFns(decls, loc, name, predefPrototypes["Mongo.Collection"]);
+        if (predefPrototypes[typ]) {
+            addAllFns(decls, loc, name, predefPrototypes[typ]);
             arity = -1;
         } else {
             if (debug) console.log("new", typ);
