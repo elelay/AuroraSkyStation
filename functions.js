@@ -178,13 +178,8 @@ var predefs = {
     },
     "Logger": {
         lib: {
-            debug: 10000,
-            error: 10000,
-            info: 10000,
             setLevel: 1,
-            setLevels: 1,
-            trace: 10000,
-            warn: 10000
+            setLevels: 1
         }
     },
     "Meteor": {
@@ -218,7 +213,6 @@ var predefs = {
             startup: 1,
             user: 0,
             userId: 0,
-            users: 0,
             wrapAsync: 2
         },
         server: {
