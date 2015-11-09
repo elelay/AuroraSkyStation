@@ -928,11 +928,11 @@ function checkRef(myDomain, declsA, errorDeclsA, ref, quietNotFound) {
                 var newRef = _.clone(ref);
                 newRef.name = ref.name.substring(0, lastDot);
                 found = checkRef(myDomain, declsA, errorDeclsA, newRef, true);
-                if (found && verbose) {
-                    console.log(ref.loc, "not found", ref.name, "but", newRef.name);
+                if (found) {
+                    warn("ref-incomplete", ref.loc, "not found " + ref.name + " but " + newRef.name);
                 }
             }
-            if(!found && !quietNotFound){
+            if (!found && !quietNotFound) {
                 error("ref-undefined", ref.loc, "reference to undefined '" + ref.name + "'");
             }
         }
