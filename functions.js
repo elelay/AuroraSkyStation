@@ -603,7 +603,7 @@ function getMemberFirstLevels(memberExpr) {
         return memberExpr.name;
     } else {
         if (memberExpr.object.type === "MemberExpression") {
-            return getMemberFirstLevels(memberExpr.object);
+            return getMemberFirstLevels(memberExpr.object) + "." + memberExpr.property.name;
         } else if (memberExpr.object.type === "Identifier") {
             return memberExpr.object.name + "." + memberExpr.property.name;
         } else {
@@ -904,28 +904,44 @@ _.each(serverDecls, function(decl, name) {
     }
 });
 
-function checkRefs(myDomain, declsA, errorDeclsA, refs) {
-    refs.forEach(function(ref) {
-        var decls = _.find(declsA, function(decls) {
-            return decls.hasOwnProperty(ref.name);
-        });
-        var decl = decls && decls[ref.name];
-        if (decl) {
-            if (decl.arity >= 0 && decl.arity < ref.arity) {
-                error("ref-arity", ref.loc, "called " + ref.name + "(" + decl.arity + ") with " + ref.arity + " parameters");
+function checkRef(myDomain, declsA, errorDeclsA, ref, quietNotFound) {
+    var decls = _.find(declsA, function(decls) {
+        return decls.hasOwnProperty(ref.name);
+    });
+    var decl = decls && decls[ref.name];
+    var found = Boolean(decl);
+    if (found) {
+        if (decl.arity >= 0 && decl.arity < ref.arity) {
+            error("ref-arity", ref.loc, "called " + ref.name + "(" + decl.arity + ") with " + ref.arity + " parameters");
+        }
+    } else {
+        _.each(errorDeclsA, function(decls, domain) {
+            if (decls[ref.name]) {
+                error("ref-domain", ref.loc, "reference to '" + ref.name + "' defined in " + domain + " from " + myDomain);
+                found = true;
             }
-        } else {
-            var found = false;
-            _.each(errorDeclsA, function(decls, domain) {
-                if (decls[ref.name]) {
-                    error("ref-domain", ref.loc, "reference to '" + ref.name + "' defined in " + domain + " from " + myDomain);
-                    found = true;
+        });
+        if (!found) {
+            var lastDot = ref.name.lastIndexOf(".");
+            if (lastDot > 0) {
+                var newRef = _.clone(ref);
+                newRef.name = ref.name.substring(0, lastDot);
+                found = checkRef(myDomain, declsA, errorDeclsA, newRef, true);
+                if (found && verbose) {
+                    console.log(ref.loc, "not found", ref.name, "but", newRef.name);
                 }
-            });
-            if (!found) {
+            }
+            if(!found && !quietNotFound){
                 error("ref-undefined", ref.loc, "reference to undefined '" + ref.name + "'");
             }
         }
+    }
+    return found;
+}
+
+function checkRefs(myDomain, declsA, errorDeclsA, refs) {
+    refs.forEach(function(ref) {
+        checkRef(myDomain, declsA, errorDeclsA, ref, false);
     });
 }
 
