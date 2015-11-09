@@ -54,6 +54,7 @@ args.forEach(function(arg) {
 
 
 var endsJS = /\.js$/;
+var endsHTML = /\.html$/;
 
 var libFiles = [],
     serverFiles = [],
@@ -108,7 +109,7 @@ function tree(root, dir, accs, acc) {
 
                 } else if (acc) {
                     acc.push(p);
-                } else if (relP.match(endsJS)) {
+                } else if (relP.match(endsJS) || relP.match(endsHTML)) {
                     throw new Error("file not in lib, client or server: '" + relP + "'");
                 }
             }
@@ -334,6 +335,30 @@ function getRefDecls(type, files, decls, refs) {
     // if(debug)console.log(type + "Refs:", refs);
 }
 
+function getDeclsTemplatesOne(f, decls) {
+    if (debug) console.log("reading", f);
+    var contents = Fs.readFileSync(f, "utf-8");
+    var templateExtractor = /<template name="([^"]+)"/g;
+    var lineNum = 1;
+
+    var result;
+    while (result = templateExtractor.exec(contents)) {
+        var loc = f + ":" + lineNum;
+        var name = "Template." + result[1];
+        if (debug) console.log(loc, "found", name);
+        addAllFns(decls, loc, name, Predefs.predefPrototypes["Template"]);
+    }
+}
+
+function getDeclsTemplates(files, decls) {
+
+    files.forEach(function(f) {
+        if (f.match(endsHTML)) {
+            getDeclsTemplatesOne(f, decls);
+        }
+    });
+}
+
 function getPackageDir(name) {
     var yname = name.match(/my:(.+)/);
     if (yname) {
@@ -398,10 +423,12 @@ getRefDecls("lib", libFiles, libDecls, libRefs);
 getRefDecls("server", serverFiles, serverDecls, serverRefs);
 getRefDecls("client", clientFiles, clientDecls, clientRefs);
 
+getDeclsTemplates(clientFiles, clientDecls);
+
 Predefs.getPredefs({
-		lib: libDecls,
-		server: serverDecls,
-		client: clientDecls
+    lib: libDecls,
+    server: serverDecls,
+    client: clientDecls
 });
 
 _.each(serverDecls, function(decl, name) {

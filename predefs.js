@@ -38,6 +38,14 @@ module.exports.predefPrototypes = {
         debug: 10000,
         info: 10000,
         warn: 10000
+    },
+    // Templates
+    "Template": {
+        events: 1,
+        helpers: 1,
+        onCreated: 1,
+        onDestroyed: 1,
+        onRendered: 1
     }
 };
 
@@ -407,45 +415,45 @@ module.exports.predefs = {
     }
 };
 
-module.exports.getPredefs = function(decls){
-	if(!decls.lib)throw "Missing decls.lib";
-	if(!decls.server)throw "Missing decls.server";
-	if(!decls.client)throw "Missing decls.client";
-	
-	_.each(module.exports.predefObjects, function(predefObject, predefObjectName) {
-		module.exports.predefs[predefObjectName] = {};
-		_.each(predefObject, function(protoName, domain) {
-			var proto = module.exports.predefPrototypes[protoName];
-			module.exports.predefs[predefObjectName][domain] = {};
-			_.each(proto, function(arity, funName) {
-				module.exports.predefs[predefObjectName][domain][funName] = arity;
-			});
-		});
-	});
-	
-	_.each(module.exports.predefs, function(predef, globName) {
-	
-		function addPredef(decls, predefDecls) {
-			_.each(predefDecls, function(arity, name) {
-				var ident = globName + "." + name;
-				if (!decls[ident]) {
-					decls[ident] = {
-						loc: "<<" + globName + ">>",
-						type: (arity >= 0) ? "function" : "",
-						arity: arity
-					};
-				}
-			});
-		}
-	
-		if (predef.lib) {
-			addPredef(decls.lib, predef.lib);
-		}
-		if (predef.client) {
-			addPredef(decls.client, predef.client);
-		}
-		if (predef.server) {
-			addPredef(decls.server, predef.server);
-		}
-	});
+module.exports.getPredefs = function(decls) {
+    if (!decls.lib) throw "Missing decls.lib";
+    if (!decls.server) throw "Missing decls.server";
+    if (!decls.client) throw "Missing decls.client";
+
+    _.each(module.exports.predefObjects, function(predefObject, predefObjectName) {
+        module.exports.predefs[predefObjectName] = {};
+        _.each(predefObject, function(protoName, domain) {
+            var proto = module.exports.predefPrototypes[protoName];
+            module.exports.predefs[predefObjectName][domain] = {};
+            _.each(proto, function(arity, funName) {
+                module.exports.predefs[predefObjectName][domain][funName] = arity;
+            });
+        });
+    });
+
+    _.each(module.exports.predefs, function(predef, globName) {
+
+        function addPredef(decls, predefDecls) {
+            _.each(predefDecls, function(arity, name) {
+                var ident = globName + "." + name;
+                if (!decls[ident]) {
+                    decls[ident] = {
+                        loc: "<<" + globName + ">>",
+                        type: (arity >= 0) ? "function" : "",
+                        arity: arity
+                    };
+                }
+            });
+        }
+
+        if (predef.lib) {
+            addPredef(decls.lib, predef.lib);
+        }
+        if (predef.client) {
+            addPredef(decls.client, predef.client);
+        }
+        if (predef.server) {
+            addPredef(decls.server, predef.server);
+        }
+    });
 }
