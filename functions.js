@@ -1,6 +1,7 @@
 "use strict";
 var Esq = require("esquery");
 var Esprima = require("esprima");
+var Eslevels = require('eslevels');
 var Fs = require("fs");
 var Path = require("path");
 var _ = require("underscore");
@@ -62,7 +63,8 @@ var libFiles = [],
     testsFiles = [];
 
 var parseOptions = {
-    loc: true
+    loc: true,
+    range: true
 };
 
 function ignoreFile(file, filePath) {
@@ -251,22 +253,27 @@ function getDecls(file, ast, globals, decls) {
     });
 }
 
-function getRefs(file, ast, globals, refs) {
+function getRefs(file, ast, levels, globals, refs) {
     var refsAST = Esq.query(ast, "CallExpression");
     refsAST.forEach(function(p) {
         if (isInterestingIdentifier(globals, p.callee, 0)) { // no level limit for refs
             var name = getMemberFirstLevels(p.callee);
             var loc = file + ":" + p.loc.start.line;
 
-            if (debug) console.log(loc, "found ref", name);
+            var lvl = levels[p.callee.range[0]];
+            if (lvl === -1) {
+                if (debug) console.log(loc, "found ref", name);
 
-            var arity = p.arguments.length;
+                var arity = p.arguments.length;
 
-            refs.push({
-                name: name,
-                loc: loc,
-                arity: arity
-            });
+                refs.push({
+                    name: name,
+                    loc: loc,
+                    arity: arity
+                });
+            } else {
+                console.log(loc, "local variable with global name:", name);
+            }
         }
     });
 }
@@ -274,9 +281,17 @@ function getRefs(file, ast, globals, refs) {
 function getDeclsRefs(file, globals, decls, refs) {
     if (verbose) console.log("reading " + file);
     var ast = Esprima.parse(Fs.readFileSync(file), parseOptions);
+    var levels = Eslevels.levels(ast, {
+        mode: "mini"
+    });
+
+    var levelsDict = {};
+    levels.forEach(function(l) {
+        levelsDict[l[1]] = l[0];
+    });
 
     getDecls(file, ast, globals, decls);
-    getRefs(file, ast, globals, refs);
+    getRefs(file, ast, levelsDict, globals, refs);
 }
 
 

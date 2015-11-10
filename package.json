@@ -1,10 +1,11 @@
 {
- "name": "AuroraSkyStation",
+ "name": "Aurore",
  "version": "0.0.1",
  "description": "A suite of checkers to observe Meteors",
  "license": "AGPL-3.0",
  "dependencies": {
     "esquery": "0.4.0",
+    "eslevels": "0.3.2",
     "glob" : "5.0.14",
     "esprima": "2.5.0",
     "underscore": "1.8.3"
