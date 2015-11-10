@@ -418,6 +418,12 @@ treePackageJS(curDir);
 if (debug) console.log("libFiles:", libFiles);
 if (debug) console.log("serverFiles:", serverFiles);
 
+Predefs.getPredefs({
+    lib: libDecls,
+    server: serverDecls,
+    client: clientDecls
+});
+
 
 getRefDecls("lib", libFiles, libDecls, libRefs);
 getRefDecls("server", serverFiles, serverDecls, serverRefs);
@@ -425,11 +431,6 @@ getRefDecls("client", clientFiles, clientDecls, clientRefs);
 
 getDeclsTemplates(clientFiles, clientDecls);
 
-Predefs.getPredefs({
-    lib: libDecls,
-    server: serverDecls,
-    client: clientDecls
-});
 
 _.each(serverDecls, function(decl, name) {
     var other = clientDecls[name];

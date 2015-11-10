@@ -2,6 +2,7 @@ var _ = require("underscore");
 
 module.exports.predefPrototypes = {
     // Mongo.Collection functions, from docs.meteor.com
+    "Meteor.Collection": "Mongo.Collection",
     "Mongo.Collection": {
         _ensureIndex: 3,
         allow: 1,
@@ -37,7 +38,8 @@ module.exports.predefPrototypes = {
         trace: 10000,
         debug: 10000,
         info: 10000,
-        warn: 10000
+        warn: 10000,
+        error: 10000
     },
     // Templates
     "Template": {
@@ -419,6 +421,13 @@ module.exports.getPredefs = function(decls) {
     if (!decls.lib) throw "Missing decls.lib";
     if (!decls.server) throw "Missing decls.server";
     if (!decls.client) throw "Missing decls.client";
+
+    _.each(module.exports.predefPrototypes, function(predefProto, predefProtoName) {
+        if (_.isString(predefProto)) {
+            module.exports.predefPrototypes[predefProtoName] = module.exports.predefPrototypes[predefProto];
+            //console.log("installing proto", predefProto, "in alias", predefProtoName, module.exports.predefPrototypes[predefProtoName])
+        }
+    });
 
     _.each(module.exports.predefObjects, function(predefObject, predefObjectName) {
         module.exports.predefs[predefObjectName] = {};
