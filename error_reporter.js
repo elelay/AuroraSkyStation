@@ -27,12 +27,12 @@ function reportError(level, id, locOrLocMessage, message) {
 
 exports.info = function(id, loc, message) {
     reportError("I", id, loc, message);
-}
+};
 
 exports.warn = function(id, loc, message) {
     reportError("W", id, loc, message);
-}
+};
 
 exports.error = function(id, loc, message) {
     reportError("E", id, loc, message);
-}
+};

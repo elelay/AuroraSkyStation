@@ -1,7 +1,7 @@
 "use strict";
 var Esq = require("esquery");
 var Esprima = require("esprima");
-var Eslevels = require('eslevels');
+var Eslevels = require("eslevels");
 var Fs = require("fs");
 var Path = require("path");
 var _ = require("underscore");
@@ -363,7 +363,7 @@ function getDeclsTemplatesOne(f, decls) {
         var loc = f + ":" + lineNum;
         var name = "Template." + result[1];
         if (debug) console.log(loc, "found", name);
-        addAllFns(decls, loc, name, Predefs.predefPrototypes["Template"]);
+        addAllFns(decls, loc, name, Predefs.predefPrototypes.Template);
     }
 }
 

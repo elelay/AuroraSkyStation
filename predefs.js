@@ -482,4 +482,4 @@ module.exports.getPredefs = function(decls) {
             addPredef(decls.server, predef.server);
         }
     });
-}
+};
