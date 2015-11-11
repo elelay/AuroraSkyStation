@@ -26,6 +26,7 @@ var debug = false;
 var verbose = false;
 var reportClientServerDiscrepancy = false;
 var reportRedefinitions = false;
+var reportThreeLevelsNotFound = false;
 var curDir;
 
 var args = process.argv.slice();
@@ -41,6 +42,7 @@ args.forEach(function(arg) {
     } else if (arg.match(/^--?p(edantic)?$/)) {
         reportClientServerDiscrepancy = true;
         reportRedefinitions = true;
+        reportThreeLevelsNotFound = true;
     } else if (arg.match(/^--?h(elp)?$/)) {
         process.stdout.write(usage);
         process.exit(0);
@@ -272,7 +274,7 @@ function getRefs(file, ast, levels, globals, refs) {
                     arity: arity
                 });
             } else {
-                console.log(loc, "local variable with global name:", name);
+                if (debug) console.log(loc, "local variable with global name:", name);
             }
         }
     });
@@ -473,6 +475,8 @@ _.each(serverDecls, function(decl, name) {
     }
 });
 
+var threeLevelsRE = /^\w+\.\w+\.\w+/;
+
 function checkRef(myDomain, declsA, errorDeclsA, ref, quietNotFound) {
     var decls = _.find(declsA, function(decls) {
         return decls.hasOwnProperty(ref.name);
@@ -497,7 +501,11 @@ function checkRef(myDomain, declsA, errorDeclsA, ref, quietNotFound) {
                 newRef.name = ref.name.substring(0, lastDot);
                 found = checkRef(myDomain, declsA, errorDeclsA, newRef, true);
                 if (found) {
-                    ErrorReporter.warn("ref-incomplete", ref.loc, "not found " + ref.name + " but " + newRef.name);
+                    if (threeLevelsRE.test(ref.name)) {
+                        if (reportThreeLevelsNotFound) ErrorReporter.info("ref-incomplete-3", ref.loc, "not found " + ref.name + " but " + newRef.name);
+                    } else {
+                        ErrorReporter.warn("ref-incomplete", ref.loc, "not found " + ref.name + " but " + newRef.name);
+                    }
                 }
             }
             if (!found && !quietNotFound) {

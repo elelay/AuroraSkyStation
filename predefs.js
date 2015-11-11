@@ -57,6 +57,9 @@ module.exports.predefObjects = {
     },
     "Meteor.users": {
         lib: "Mongo.Collection"
+    },
+    "ServiceConfiguration.configurations": {
+        lib: "Mongo.Collection"
     }
 };
 
@@ -105,7 +108,21 @@ module.exports.predefs = {
     "BrowserPolicy": {
         server: {
             content: -1,
-            framing: -1
+            "content.allowDataUrlForAll": 0,
+            "content.allowEval": 0,
+            "content.allowImageOrigin": 1,
+            "content.allowInlineScripts": 0,
+            "content.allowInlineStyles": 0,
+            "content.allowOriginForAll": 1,
+            "content.allowSameOriginForAll": 0,
+            "content.disallowAll": 0,
+            "content.disallowEval": 0,
+            "content.disallowInlineScripts": 0,
+            "content.disallowInlineStyles": 0,
+            framing: -1,
+            "framing.allowAll": 0,
+            "framing.disallow": 0,
+            "framing.restrictToOrigin": 1
         }
     },
     // https://github.com/meteorhacks/cluster
