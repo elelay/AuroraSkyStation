@@ -8,6 +8,7 @@
     "eslevels": "0.3.2",
     "glob" : "5.0.14",
     "esprima": "2.5.0",
-    "underscore": "1.8.3"
+    "underscore": "1.8.3",
+    "esrecurse" : "3.1.x"
   }
 }
