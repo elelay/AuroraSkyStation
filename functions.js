@@ -86,8 +86,14 @@ function tree(root, dir, accs, acc) {
                 var stats = Fs.lstatSync(p);
                 if (stats.isSymbolicLink(p)) {
                     if (debug) console.log("resolving symlink", p);
-                    p = Fs.realpathSync(p);
-                    if (debug) console.log("=>", p);
+                    try {
+                        Fs.statSync(p); // will throw an error before realPathSync does (and it's not catchable)
+                        p = Fs.realpathSync(p);
+                        if (debug) console.log("=>", p);
+                    } catch (e) {
+                        ErrorReporter.error("bad-link", p, "bad symlink: " + p);
+                        return;
+                    }
                     stats = Fs.lstatSync(p);
                     if (stats.isDirectory()) {
                         return tree(p, p, accs, acc);
@@ -168,8 +174,12 @@ function getMemberFirstLevels(memberExpr) {
             return getMemberFirstLevels(memberExpr.object) + "." + memberExpr.property.name;
         } else if (memberExpr.object.type === "Identifier") {
             return memberExpr.object.name + "." + memberExpr.property.name;
+        } else if (memberExpr.object.type === "ThisExpression") {
+            return "this" + "." + memberExpr.property.name;
+        } else if (memberExpr.object.type === "CallExpression") {
+            return "";
         } else {
-            console.error("E: unexpected identifier:", memberExpr);
+            console.error("E: unexpected identifier:", memberExpr.loc.file, memberExpr);
             process.exit(1);
         }
     }
@@ -301,13 +311,13 @@ function getRefs(file, ast, levels, globals, type, all) {
                 var testServer = (mem === "Meteor.isServer");
                 var testClient = (mem === "Meteor.isClient");
                 if (testClient || testServer) {
-					var loc = file + ":" + p.loc.start.line;
+                    var loc = file + ":" + p.loc.start.line;
                     if ((inServer && testClient) ||
                         (inClient && testServer)) {
-                        ErrorReporter.warn("dead-code", loc, "dead code following test for " + mem + " in "+(inClient?"client":"server"));
+                        ErrorReporter.warn("dead-code", loc, "dead code following test for " + mem + " in " + (inClient ? "client" : "server"));
                     } else if ((inServer && testServer) ||
                         (inClient && testClient)) {
-                        ErrorReporter.info("redundant-code", loc, "redundant test for " + mem + " in "+(inClient?"client":"server"));
+                        ErrorReporter.info("redundant-code", loc, "redundant test for " + mem + " in " + (inClient ? "client" : "server"));
                     } else if (inLib) {
                         if (debug) console.log(loc, "found test", mem);
                         inClient = testClient;
@@ -618,4 +628,4 @@ _.each(ErrorReporter.errorCounters, function(idC, level) {
         if (id === "_cnt") return;
         process.stderr.write(" " + padRight(c) + " " + id + "\n");
     });
-});
+})
