@@ -2,6 +2,7 @@
 var Esq = require("esquery");
 var Esrecurse = require("esrecurse");
 var Esprima = require("esprima");
+var Escope = require("escope");
 var Eslevels = require("eslevels");
 var Fs = require("fs");
 var Path = require("path");
@@ -437,7 +438,7 @@ function getDeclsTemplates(files, decls) {
 }
 
 function getPackageDir(name) {
-    var yname = name.match(/y:(.+)/);
+    var yname = name.match(/y:([^@]+)(@.+)?/);
     if (yname) {
         var n = yname[1];
         var packageDir = Path.resolve(curDir, "../" + n);
@@ -451,12 +452,75 @@ function getPackageDir(name) {
     }
 }
 
+/*
+ * to later access all references in linear time.
+ * Unused for now because very few variable references in package.js
+ */
+function computeReferences(scopeManager) {
+    var res = [];
+    scopeManager.scopes.forEach(function(scope) {
+        scope.references.forEach(function(ref) {
+            res.push(ref);
+        });
+    });
+    return res;
+}
+
+function findReference(scopeManager, nodeRef) {
+    var res = null;
+    scopeManager.scopes.forEach(function(scope) {
+        scope.references.forEach(function(ref) {
+            if (ref.identifier === nodeRef) {
+                res = ref;
+            }
+        });
+    });
+    return res;
+}
+
+function getArrayContents(file, allRefs, node) {
+    var packages;
+    if (node.type === "ArrayExpression") {
+        packages = node.elements.map(function(elt) {
+            return elt.value;
+        });
+    } else if (node.type === 'Literal')  {
+        packages = [node.value];
+    } else if (node.type === "Identifier") {
+        //var ref = _.find(allRefs, function(r){ return r.identifier === node;});
+        var ref = findReference(allRefs, node);
+        if (ref) {
+            if (ref.resolved.defs.length === 1) {
+                var def = ref.resolved.defs[0];
+                if (def.node.type === 'VariableDeclarator') {
+                    var init = def.node.init;
+                    packages = getArrayContents(file, allRefs, init);
+                }
+            } else {
+                console.error("E:", file, node.name, "has", ref.resolved.defs.length, "definitions");
+                packages = [];
+            }
+        } else {
+            console.error("E:", file, "declaration of", node.name, "not found");
+            packages = [];
+        }
+    } else {
+        console.error("E: unsupported argument to api.use", node.loc.file, p);
+    }
+
+    if (debug) console.log("D: api.use(" + packages + ")");
+    return packages;
+}
+
 function treePackageJS(curDir) {
     var packageJS = Path.join(curDir, "package.js");
     if (Fs.existsSync(packageJS)) {
         if (verbose) console.log("following", packageJS);
 
         var ast = Esprima.parse(Fs.readFileSync(packageJS), parseOptions);
+        var scopeManager = Escope.analyze(ast);
+        //var allRefs = computeReferences(scopeManager);
+
         var uses = Esq.query(ast, "CallExpression");
         uses.forEach(function(p) {
             var isApiUse = (p.callee.type === "MemberExpression") &&
@@ -464,12 +528,8 @@ function treePackageJS(curDir) {
                 p.callee.property && (p.callee.property.name === "use") &&
                 (p.arguments.length === 1 || p.arguments.length === 2);
             if (isApiUse) {
-                var packages = [];
-                if (p.arguments[0].type === "ArrayExpression") {
-                    packages = p.arguments[0].elements.map(function(elt) {
-                        return elt.value;
-                    });
-                }
+                //var packages = getArrayContents(packageJS, allRefs, p.arguments[0]);
+                var packages = getArrayContents(packageJS, scopeManager, p.arguments[0]);
                 packages.forEach(function(name) {
                     var packageDir = getPackageDir(name);
                     if (debug) console.log("package", name, "=>", packageDir);
