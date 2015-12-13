@@ -16,11 +16,12 @@ var ErrorReporter = require("./error_reporter.js");
  */
 
 var usage =
-    "Usage: node " + process.argv[1] + " [-v/--verbose] [-d/--debug] [-p/--pedantic] [DIR]\n" +
+    "Usage: node " + process.argv[1] + " [-v/--verbose] [-d/--debug] [-p/--pedantic] [-t/--this-only] [DIR]\n" +
     "\n" +
     "    -v, --verbose    be more verbose\n" +
     "    -d, --debug      debug messages\n" +
     "    -p, --pedantic   more warnings\n" +
+    "    -t, --this-code  don't show errors in dependencies\n" +
     "    [DIR]            directory to scan\n" +
     "\n";
 
@@ -29,6 +30,7 @@ var verbose = false;
 var reportClientServerDiscrepancy = false;
 var reportRedefinitions = false;
 var reportThreeLevelsNotFound = false;
+var thisCodeOnly = false;
 var curDir;
 
 var args = process.argv.slice();
@@ -45,6 +47,8 @@ args.forEach(function(arg) {
         reportClientServerDiscrepancy = true;
         reportRedefinitions = true;
         reportThreeLevelsNotFound = true;
+    } else if (arg.match(/^--?t(his-code)?$/)) {
+        thisCodeOnly = true;
     } else if (arg.match(/^--?h(elp)?$/)) {
         process.stdout.write(usage);
         process.exit(0);
@@ -360,6 +364,10 @@ function getDeclsRefs(file, type, all, globals) {
 if (!curDir) {
     curDir = process.cwd();
 }
+
+ErrorReporter.debug = debug;
+ErrorReporter.curDir = curDir;
+ErrorReporter.thisCodeOnly = thisCodeOnly;
 
 process.stdout.write("Scanning " + curDir + "...\n");
 
