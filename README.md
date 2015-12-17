@@ -1,6 +1,6 @@
 # Aurore - a meteor project checker
 
-Install with `npm install`.
+Install with `npm install -g`.
 
 ## Pubsub
 
@@ -19,7 +19,7 @@ Checks that methods called actually exist.
 
 ## Functions
 
-	node functions.js [-v/--verbose] [-d/--debug] [-p/--pedantic] [PROJECT_DIRECTORY]
+	aurore [-v/--verbose] [-d/--debug] [-p/--pedantic] [-t/--this-only] [PROJECT_DIRECTORY]
 
 Checks that
  - global references actually exist and if functions, they are not given
@@ -28,16 +28,46 @@ Checks that
  - globals are not redefined (with the -p option)
 
 
-Needs a whitelist of predefined objects and functions.
+Needs a whitelist of predefined objects and functions (see `src/predefs.js`).
 
 If a `packages` directory exists, its subdirectories (or symlinks) will be scanned.
 
-If a `package.js` file exists, it will be read packages listed in `api.use` will be analyzed recursively.
+If a `package.js` file exists, it will be read and packages listed in `api.use` will be analyzed recursively.
 `functions.js` looks for packages in parent directory and uses a custom name mapping,
-so you may have to modify `getPackageDir(packageName)` for your project.
+so you may have to modify `src/find_files.js#getPackageDir(packageName)` for your project.
 
 All files are gathered before checking decls/refs, so it's better to run `functions.js`
 for every package, to be sure that it only depends on packages it uses.
 
-Redefinitions may be legitimate (different definitions, in an if/else),
-so redefinitions are only Information level messages.
+### Messages
+
+#### Information
+
+ - *redef*
+   Redefinitions may be legitimate (different definitions, in an if/else),
+   so redefinitions are only Information level messages.
+
+ - *redundant-code*
+   When using `Meteor.isServer` and `Meteor.isClient` respectively  in a server and client context.
+
+#### Warning
+
+ - *dead-code*
+   For code in an `if(Meteor.isServer)` and `if(Meteor.isClient)` respectively  in a client and server context.
+
+ - *ref-incomplete*
+
+ - *client-server-discrepancy-arity*
+
+ - *client-server-shadows-lib*
+
+#### Error
+
+ - *bad-link*
+ Could not follow a symlink.
+
+ - *ref-arity*
+
+ - *ref-domain*
+
+ - *ref-undefined*
