@@ -6,6 +6,7 @@
  "dependencies": {
     "esquery": "0.4.0",
     "eslevels": "0.3.2",
+    "escope": "3.3.0",
     "glob" : "5.0.14",
     "esprima": "2.5.0",
     "underscore": "1.8.3",
