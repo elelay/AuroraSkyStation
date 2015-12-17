@@ -59,7 +59,7 @@ function reportError(level, id, locOrLocMessage, message) {
     exports.errorCounters[level][id] = (exports.errorCounters[level][id] || 0) + 1;
 
     if (message) {
-        process.stderr.write(locOrLocMessage + "\t" + level + ": " + message + "\n");
+        process.stderr.write(locOrLocMessage + "\t" + level + ":" + id + ": " + message + "\n");
     } else {
         locOrLocMessage.forEach(function(lm) {
             process.stderr.write(lm[0] + "\t" + level + ": " + lm[1] + "\n");

@@ -1,15 +1,25 @@
 {
- "name": "Aurore",
- "version": "0.0.1",
- "description": "A suite of checkers to observe Meteors",
- "license": "AGPL-3.0",
- "dependencies": {
-    "esquery": "0.4.0",
-    "eslevels": "0.3.2",
-    "escope": "3.3.0",
-    "glob" : "5.0.14",
-    "esprima": "2.5.0",
-    "underscore": "1.8.3",
-    "esrecurse" : "3.1.x"
-  }
+	"name": "Aurore",
+	"version": "0.0.1",
+	"description": "A suite of checkers to observe Meteors",
+	"license": "AGPL-3.0",
+	"repository":
+	{
+		"type": "git",
+		"url": "https://github.com/elelay/aurore.git"
+	},
+	"dependencies":
+	{
+		"esquery": "0.4.0",
+		"eslevels": "0.3.2",
+		"escope": "3.3.0",
+		"glob": "5.0.14",
+		"esprima": "2.5.0",
+		"underscore": "1.8.3",
+		"esrecurse": "3.1.x"	
+	},
+	"bin":
+	{
+		"aurore": "./bin/aurore"	
+	}	
 }
