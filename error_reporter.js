@@ -19,19 +19,37 @@ exports.curDir = null;
 
 exports.debug = false;
 
-function excludeThisCodeOnly(locOrMessage, message) {
+exports.disable =   {};
+
+function silenceThisCodeOnly(loc) {
+    return exports.thisCodeOnly && !loc.startsWith(exports.curDir);
+}
+
+var locToFileRE = /^(.+):\d+$/;
+
+function silenceDisable(id, loc) {
+    var res = locToFileRE.exec(loc);
+    var file = (res && res[1]) || loc;
+    return exports.disable[file] && exports.disable[file][id];
+}
+
+function silenceOne(id, loc) {
+    return silenceThisCodeOnly(loc) || silenceDisable(id, loc);
+}
+
+function silence(id, locOrLocMessage, message) {
     if (message) {
-        return !locOrMessage.startsWith(exports.curDir);
+        return silenceOne(id, locOrLocMessage);
     } else {
         return _.every(locOrLocMessage, function(lm) {
-            return excludeThisCodeOnly(lm[0]);
+            return silenceOne(id, lm[0]);
         });
     }
 }
 
 function reportError(level, id, locOrLocMessage, message) {
 
-    if (exports.thisCodeOnly && excludeThisCodeOnly(locOrLocMessage, message)) {
+    if (silence(id, locOrLocMessage, message)) {
         if (exports.debug) console.log("D: silent error", level, id, locOrLocMessage, message);
         return;
     }

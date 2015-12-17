@@ -344,6 +344,8 @@ function getRefs(file, ast, levels, globals, type, all) {
     visitor.visit(ast);
 }
 
+var useAuroreRE = /^\s*use\s+aurore::([^ ]+)\s+false\s*$/;
+
 function getDeclsRefs(file, type, all, globals) {
     if (verbose) console.log("reading " + file);
     var ast = Esprima.parse(Fs.readFileSync(file), parseOptions);
@@ -354,6 +356,19 @@ function getDeclsRefs(file, type, all, globals) {
     var levelsDict = {};
     levels.forEach(function(l) {
         levelsDict[l[1]] = l[0];
+    });
+
+    var topLiterals = Esq.query(ast, "Program > ExpressionStatement > Literal");
+    topLiterals.forEach(function(l) {
+        var res = useAuroreRE.exec(l.value);
+        if (res) {
+            var ident = res[1];
+            if (verbose) console.log("disabling", ident, "for", file);
+            if (!ErrorReporter.disable[file]) {
+                ErrorReporter.disable[file] = {};
+            }
+            ErrorReporter.disable[file][ident] = true;
+        }
     });
 
     getDecls(file, ast, globals, type, all);
