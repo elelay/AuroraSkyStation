@@ -73,7 +73,7 @@ function tree(root, dir, accs, acc) {
 }
 
 function getPackageDir(root, name) {
-    var yname = name.match(/y:([^@]+)(@.+)?/);
+    var yname = name.match(/^y:([^@]+)(@.+)?/);
     if (yname) {
         var n = yname[1];
         var packageDir = Path.resolve(root, "../" + n);
