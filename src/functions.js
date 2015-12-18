@@ -462,6 +462,9 @@ function interpret(argv) {
         }, undefined);
     }
 
+    FindFiles.treePackageJS(curDir, curDir, filesObj);
+
+
     // FIXME: as long as duplicate files in packages
     libFiles.sort();
     serverFiles.sort();
@@ -470,8 +473,6 @@ function interpret(argv) {
     libFiles = _.uniq(libFiles, true);
     serverFiles = _.uniq(serverFiles, true);
     clientFiles = _.uniq(clientFiles, true);
-
-    FindFiles.treePackageJS(curDir, curDir, filesObj);
 
     if (debug) console.log("libFiles:", libFiles);
     if (debug) console.log("serverFiles:", serverFiles);
