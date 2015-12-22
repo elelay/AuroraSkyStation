@@ -22,7 +22,7 @@ exports.debug = false;
 exports.disable =   {};
 
 function silenceThisCodeOnly(loc) {
-    return exports.thisCodeOnly && !loc.startsWith(exports.curDir);
+    return exports.thisCodeOnly && (loc.indexOf(exports.curDir) != 0);
 }
 
 var locToFileRE = /^(.+):\d+$/;
