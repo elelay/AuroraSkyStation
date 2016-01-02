@@ -69,12 +69,14 @@ module.exports.predefs = {
         lib: {
             _storedLoginToken: 0,
             createUser: 2,
-            onLogin: 1
+            onLogin: 1,
+            oauth: -1 // oauth package
         },
         client: {
             ui: -1
         },
         server: {
+            addAutopublishFields: 1,
             onCreateUser: 1,
             validateNewUser: 1
         }
@@ -156,7 +158,8 @@ module.exports.predefs = {
     "Logger": {
         lib: {
             setLevel: 1,
-            setLevels: 1
+            setLevels: 1,
+            listener: -1
         }
     },
     "Meteor": {
@@ -202,11 +205,34 @@ module.exports.predefs = {
             require: 1
         }
     },
+    "OAuth": {
+        // https://github.com/meteor/meteor/blob/dc3cd6eb92f2bdd1bb44000cdd6abd1e5d0285b1/packages/oauth/oauth_client.js
+        client: {
+            _loginStyle: 3,
+            _stateParam: 3,
+            launchLogin: 1
+        },
+        // https://github.com/meteor/meteor/blob/dc3cd6eb92f2bdd1bb44000cdd6abd1e5d0285b1/packages/oauth/oauth_server.js
+        server: {
+            registerService: 4,
+            retrieveCredential: 2,
+            sealSecret: 1
+        }
+    },
     // docs.meteor.com
     "Random": {
         lib: {
+            choice: 1,
             fraction: 0,
-            id: 1
+            hexString: 1,
+            id: 1,
+            secret: 1
+        }
+    },
+    // https://github.com/iron-meteor/iron-router/blob/57a295ef387aec2715a7b43efc694c3e6012b764/examples/route_controllers/route_controllers.js
+    "RouteController": {
+        lib: {
+            extend: 1
         }
     },
     "Router": {
@@ -218,7 +244,8 @@ module.exports.predefs = {
             configure: 1,
             current: 0,
             route: 3,
-            routes: -1
+            routes: -1,
+            onBeforeAction: 1
         }
     },
     // docs.meteor.com
@@ -263,6 +290,17 @@ module.exports.predefs = {
             instance: 0,
             parentData: 1,
             registerHelper: 2
+        }
+    },
+    // https://github.com/mizzao/meteor-timesync/
+    "TimeSync": {
+        client: {
+            isSynced: 0,
+            loggingEnabled: -1,
+            resync: 0,
+            roundTripTime: 0,
+            serverOffset: 0,
+            serverTime: 2,
         }
     },
     "Tracker": {
