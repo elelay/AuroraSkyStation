@@ -15,3 +15,5 @@ if(Meteor.isServer){
 		console.log("I'm redundant (recurse)");
 	}
 }
+
+var x = Meteor.isClient ? "client" : Session.get("illegalOnServer");

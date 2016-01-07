@@ -5,3 +5,5 @@ if(Meteor.isClient){
 if(Meteor.isServer){
 	Meteor.publish("dummy");
 }
+
+var x = Meteor.isClient ? Session.get("session") : "server";

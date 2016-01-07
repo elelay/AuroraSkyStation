@@ -5,3 +5,5 @@ if(Meteor.isClient){
 if(Meteor.isServer){
 	console.log("I'm redundant");
 }
+
+Meteor.isServer ? "server" : Meteor.methods({});

@@ -5,6 +5,7 @@ var Esprima = require("esprima");
 var Eslevels = require("eslevels");
 var Fs = require("fs");
 var Path = require("path");
+var Util = require("util");
 var _ = require("underscore");
 var Predefs = require("./predefs.js");
 var ErrorReporter = require("./error_reporter.js");
@@ -167,7 +168,46 @@ function getRefs(file, ast, levels, globals, type, all) {
     var inClient = (type === "client");
     var inServer = (type === "server");
     var inLib = (type === "lib");
-    var visitor = new Esrecurse.Visitor({
+
+
+
+    function DerivedVisitor(options) {
+        Esrecurse.Visitor.call(this, options);
+    }
+    Util.inherits(DerivedVisitor, Esrecurse.Visitor);
+    DerivedVisitor.prototype.ifOrConditionalExpression = function(p) {
+        var notVisited = true;
+        if (p.test.type === "MemberExpression") {
+            var mem = getMemberFirstLevels(p.test);
+            var testServer = (mem === "Meteor.isServer");
+            var testClient = (mem === "Meteor.isClient");
+            if (testClient || testServer) {
+                var loc = file + ":" + p.loc.start.line;
+                if ((inServer && testClient) ||
+                    (inClient && testServer)) {
+                    ErrorReporter.warn("dead-code", loc, "dead code following test for " + mem + " in " + (inClient ? "client" : "server"));
+                } else if ((inServer && testServer) ||
+                    (inClient && testClient)) {
+                    ErrorReporter.info("redundant-code", loc, "redundant test for " + mem + " in " + (inClient ? "client" : "server"));
+                } else if (inLib) {
+                    if (debug) console.log(loc, "found test", mem);
+                    inClient = testClient;
+                    inServer = !inClient;
+                    inLib = false;
+                    this.visit(p.consequent);
+                    inClient = !inClient;
+                    inServer = !inClient;
+                    this.visit(p.alternate);
+                    inLib = true;
+                    inClient = inServer = false;
+                    notVisited = false;
+                }
+            }
+        }
+        if (notVisited) this.visitChildren(p);
+    };
+
+    var visitor = new DerivedVisitor({
         CallExpression: function(p) {
             if (isInterestingIdentifier(globals, p.callee, 0)) { // no level limit for refs
                 var name = getMemberFirstLevels(p.callee);
@@ -198,35 +238,10 @@ function getRefs(file, ast, levels, globals, type, all) {
             this.visitChildren(p);
         },
         IfStatement: function(p) {
-            var notVisited = true;
-            if (p.test.type === "MemberExpression") {
-                var mem = getMemberFirstLevels(p.test);
-                var testServer = (mem === "Meteor.isServer");
-                var testClient = (mem === "Meteor.isClient");
-                if (testClient || testServer) {
-                    var loc = file + ":" + p.loc.start.line;
-                    if ((inServer && testClient) ||
-                        (inClient && testServer)) {
-                        ErrorReporter.warn("dead-code", loc, "dead code following test for " + mem + " in " + (inClient ? "client" : "server"));
-                    } else if ((inServer && testServer) ||
-                        (inClient && testClient)) {
-                        ErrorReporter.info("redundant-code", loc, "redundant test for " + mem + " in " + (inClient ? "client" : "server"));
-                    } else if (inLib) {
-                        if (debug) console.log(loc, "found test", mem);
-                        inClient = testClient;
-                        inServer = !inClient;
-                        inLib = false;
-                        this.visit(p.consequent);
-                        inClient = !inClient;
-                        inServer = !inClient;
-                        this.visit(p.alternate);
-                        inLib = true;
-                        inClient = inServer = false;
-                        notVisited = false;
-                    }
-                }
-            }
-            if (notVisited) this.visitChildren(p);
+            this.ifOrConditionalExpression(p);
+        },
+        ConditionalExpression: function(p) {
+            this.ifOrConditionalExpression(p);
         }
     });
     visitor.visit(ast);
@@ -353,11 +368,11 @@ function checkRefs(myDomain, declsA, errorDeclsA, refs) {
 }
 
 function report() {
-	var labels = {
-		"I": "information",
-		"W": "warning",
-		"E": "error"
-	};
+    var labels = {
+        "I": "information",
+        "W": "warning",
+        "E": "error"
+    };
     var maxLen = Math.floor(Math.log10(ErrorReporter.errorCounters._cnt || 1)) + 1;
 
     function padRight(v) {
@@ -376,11 +391,11 @@ function report() {
         process.stderr.write(" " + padRight(idC._cnt) + " " + labels[level] + "\n");
         _.each(idC, function(c, id) {
             if (id === "_cnt") return;
-            process.stderr.write( new Array(maxLen+1).join(" ")+"  " + padRight(c) + " " + id + "\n");
+            process.stderr.write(new Array(maxLen + 1).join(" ") + "  " + padRight(c) + " " + id + "\n");
         });
     });
     process.stderr.write(" =================================================\n");
-    process.stderr.write(JSON.stringify(ErrorReporter.errorCounters)+"\n");
+    process.stderr.write(JSON.stringify(ErrorReporter.errorCounters) + "\n");
 }
 
 function interpret(argv) {
