@@ -167,6 +167,14 @@ function getDecls(file, ast, globals, type, all) {
     visitor.visit(ast);
 }
 
+function isWhereServer(p) {
+    return (p.type === "ObjectExpression") &&
+        _.some(p.properties, function(prop) {
+            return (prop.key.type === "Identifier" && prop.key.name === "where") &&
+                (prop.value.type === "Literal" && prop.value.value === "server");
+        });
+}
+
 function getRefs(file, ast, levels, globals, type, all) {
     var inClient = (type === "client");
     var inServer = (type === "server");
@@ -243,8 +251,38 @@ function getRefs(file, ast, levels, globals, type, all) {
     var visitor = new DerivedVisitor({
         CallExpression: function(p) {
             var arity = p.arguments.length;
-            this.tryMemberExpression(p.callee, arity);
-            this.visitChildren(p);
+            var notVisited = true;
+            if (inLib && isInterestingIdentifier(globals, p.callee, 0)) {
+                var name = getMemberFirstLevels(p.callee);
+                var isRoute = name === "Router.route";
+                var isController = name === "RouteController.extend";
+                var isAccountsConfigure = name === "AccountsTemplates.configure";
+                if (isRoute || isController || isAccountsConfigure) {
+                    var loc = file + ":" + p.loc.start.line;
+                    var onServer = (p.arguments.length === 3 && isWhereServer(p.arguments[2]));
+                    var onClient = (isRoute &&
+                            p.arguments.length === 2 &&
+                            p.arguments[1].type === "ObjectExpression") ||
+                        (isRoute && !onServer) || isController || isAccountsConfigure;
+
+                    if (onClient || onServer) {
+                        if (debug) console.log(loc, "found", onClient ? "client" : "server", "route");
+                        inClient = onClient;
+                        inServer = !inClient;
+                        inLib = false;
+                        p.arguments.forEach(function(arg) {
+                            this.visit(arg);
+                        }, this);
+                        inLib = true;
+                        inClient = inServer = false;
+                        notVisited = false;
+                    }
+                }
+            }
+            if (notVisited) {
+                this.tryMemberExpression(p.callee, arity);
+                this.visitChildren(p);
+            }
         },
         IfStatement: function(p) {
             this.ifOrConditionalExpression(p);
