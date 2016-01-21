@@ -161,7 +161,7 @@ function treePackageJS(root, curDir, files) {
             var isApiUse = (p.callee.type === "MemberExpression") &&
                 p.callee.object && (p.callee.object.name === "api") &&
                 p.callee.property && (p.callee.property.name === "use") &&
-                (p.arguments.length === 1 || p.arguments.length === 2);
+                (p.arguments.length >= 1 && p.arguments.length <= 3);
             if (isApiUse) {
                 //var packages = getArrayContents(packageJS, allRefs, p.arguments[0]);
                 var packages = getArrayContents(packageJS, scopeManager, p.arguments[0]);
