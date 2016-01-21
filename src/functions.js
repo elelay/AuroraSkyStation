@@ -125,6 +125,9 @@ function addDeclsForName(file, loc, name, value, decls) {
             }
         });
         arity = -1;
+    } else if (value.type === "Literal") {
+        if (debug) console.log(loc, "found decl", name + ": Literal");
+        arity = -1;
     } else {
         if (debug) console.log(loc, "found decl", name);
     }
@@ -202,39 +205,45 @@ function getRefs(file, ast, levels, globals, type, all) {
                     inClient = inServer = false;
                     notVisited = false;
                 }
+            } else {
+                this.tryMemberExpression(p.test, -1);
             }
         }
         if (notVisited) this.visitChildren(p);
     };
 
+    DerivedVisitor.prototype.tryMemberExpression = function(p, arity) {
+        if (isInterestingIdentifier(globals, p, 0)) { // no level limit for refs
+            var name = getMemberFirstLevels(p);
+            var loc = file + ":" + p.loc.start.line;
+
+            var lvl = levels[p.range[0]];
+            if (lvl === -1) {
+                if (debug) console.log(loc, "found ref", name, arity);
+
+                var refs;
+                if (inLib) refs = all.lib.refs;
+                else if (inServer) refs = all.server.refs;
+                else if (inClient) refs = all.client.refs;
+                else {
+                    process.error(loc, "not in lib, client or server");
+                    process.exit(-1);
+                }
+                refs.push({
+                    name: name,
+                    loc: loc,
+                    arity: arity
+                });
+            } else {
+                if (debug) console.log(loc, "local variable with global name:", name);
+            }
+        }
+    };
+
     var visitor = new DerivedVisitor({
         CallExpression: function(p) {
-            if (isInterestingIdentifier(globals, p.callee, 0)) { // no level limit for refs
-                var name = getMemberFirstLevels(p.callee);
-                var loc = file + ":" + p.loc.start.line;
-
-                var lvl = levels[p.callee.range[0]];
-                if (lvl === -1) {
-                    if (debug) console.log(loc, "found ref", name);
-
-                    var arity = p.arguments.length;
-                    var refs;
-                    if (inLib) refs = all.lib.refs;
-                    else if (inServer) refs = all.server.refs;
-                    else if (inClient) refs = all.client.refs;
-                    else {
-                        process.error(loc, "not in lib, client or server");
-                        process.exit(-1);
-                    }
-                    refs.push({
-                        name: name,
-                        loc: loc,
-                        arity: arity
-                    });
-                } else {
-                    if (debug) console.log(loc, "local variable with global name:", name);
-                }
-            }
+            var arity = p.arguments.length;
+            this.tryMemberExpression(p.callee, arity);
             this.visitChildren(p);
         },
         IfStatement: function(p) {
@@ -242,6 +251,13 @@ function getRefs(file, ast, levels, globals, type, all) {
         },
         ConditionalExpression: function(p) {
             this.ifOrConditionalExpression(p);
+        },
+        ExpressionStatement: function(p) {
+            if (p.expression.type === "MemberExpression") {
+                this.tryMemberExpression(p.expression, -1);
+            } else {
+                this.visitChildren(p);
+            }
         }
     });
     visitor.visit(ast);
@@ -331,6 +347,8 @@ function checkRef(myDomain, declsA, errorDeclsA, ref, quietNotFound) {
     if (found) {
         if (decl.arity >= 0 && decl.arity < ref.arity) {
             ErrorReporter.error("ref-arity", ref.loc, "called " + ref.name + "(" + decl.arity + ") with " + ref.arity + " parameters");
+        } else if (decl.arity < 0 && ref.arity >= 0 && !quietNotFound) {
+            ErrorReporter.error("ref-arity", ref.loc, "called non function " + ref.name + " with " + ref.arity + " parameters");
         }
     } else {
         _.each(errorDeclsA, function(decls, domain) {
