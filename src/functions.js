@@ -99,7 +99,7 @@ function addDeclsForName(file, loc, name, value, decls) {
         if (arity === 0) {
             var usesArguments = Esq.query(value, "[type='Identifier'][name='arguments']");
             if (usesArguments.length) {
-                arity = -1; // variable arguments
+                arity = -2; // variable arguments
             }
         }
         if (debug) console.log(loc, "found decl", name + "(" + arity + ")");
@@ -347,7 +347,7 @@ function checkRef(myDomain, declsA, errorDeclsA, ref, quietNotFound) {
     if (found) {
         if (decl.arity >= 0 && decl.arity < ref.arity) {
             ErrorReporter.error("ref-arity", ref.loc, "called " + ref.name + "(" + decl.arity + ") with " + ref.arity + " parameters");
-        } else if (decl.arity < 0 && ref.arity >= 0 && !quietNotFound) {
+        } else if (decl.arity == -1 && ref.arity >= 0 && !quietNotFound) {
             ErrorReporter.error("ref-arity", ref.loc, "called non function " + ref.name + " with " + ref.arity + " parameters");
         }
     } else {
