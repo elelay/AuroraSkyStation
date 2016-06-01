@@ -175,6 +175,22 @@ function isWhereServer(p) {
         });
 }
 
+function testIsClientServer(pTest) {
+    if (pTest.type === "MemberExpression") {
+        var test = {
+            not: false
+        };
+        test.mem = getMemberFirstLevels(pTest);
+        test.server = (test.mem === "Meteor.isServer");
+        test.client = (test.mem === "Meteor.isClient") || (test.mem === "this.isSimulation");
+    } else {
+        var test = testIsClientServer(pTest.argument);
+        test.not = true;
+        test.mem = "!" + test.mem;
+    }
+    return test;
+}
+
 function getRefs(file, ast, levels, globals, type, all) {
     var inClient = (type === "client");
     var inServer = (type === "server");
@@ -188,20 +204,24 @@ function getRefs(file, ast, levels, globals, type, all) {
     Util.inherits(DerivedVisitor, Esrecurse.Visitor);
     DerivedVisitor.prototype.ifOrConditionalExpression = function(p) {
         var notVisited = true;
-        if (p.test.type === "MemberExpression") {
-            var mem = getMemberFirstLevels(p.test);
-            var testServer = (mem === "Meteor.isServer");
-            var testClient = (mem === "Meteor.isClient");
-            if (testClient || testServer) {
+        if ((p.test.type === "MemberExpression") ||
+            (p.test.type === "UnaryExpression" && p.test.operator === "!" &&
+                p.test.argument.type === "MemberExpression")) {
+            var test = testIsClientServer(p.test);
+            if (test.client || test.server) {
+
+                var testServer = test.not ? !test.server : test.server;
+                var testClient = test.not ? !test.client : test.client;
+
                 var loc = file + ":" + p.loc.start.line;
                 if ((inServer && testClient) ||
                     (inClient && testServer)) {
-                    ErrorReporter.warn("dead-code", loc, "dead code following test for " + mem + " in " + (inClient ? "client" : "server"));
+                    ErrorReporter.warn("dead-code", loc, "dead code following test for " + test.mem + " in " + (inClient ? "client" : "server"));
                 } else if ((inServer && testServer) ||
                     (inClient && testClient)) {
-                    ErrorReporter.info("redundant-code", loc, "redundant test for " + mem + " in " + (inClient ? "client" : "server"));
+                    ErrorReporter.info("redundant-code", loc, "redundant test for " + test.mem + " in " + (inClient ? "client" : "server"));
                 } else if (inLib) {
-                    if (debug) console.log(loc, "found test", mem);
+                    if (debug) console.log(loc, "found test", test.mem);
                     inClient = testClient;
                     inServer = !inClient;
                     inLib = false;
