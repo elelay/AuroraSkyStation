@@ -18,6 +18,18 @@ module.exports.predefPrototypes = {
         // https://github.com/meteorhacks/meteor-aggregate
         aggregate: 2
     },
+    // https://github.com/meteor/promise
+    "Promise": {
+        await: 1,
+        "catch": 1,
+        then: 2
+    },
+    // https://github.com/lablancas/twitter
+    "Twitter": {
+        getAsync: 4,
+        postAsync: 4,
+        streamAsync: 4
+    },
     // Tracker.Dependency functions, from docs.meteor.com
     "Tracker.Dependency": {
         client: {
@@ -106,6 +118,13 @@ module.exports.predefs = {
             getView: 2
         }
     },
+    // https://github.com/kadirahq/blaze-layout
+    "BlazeLayout": {
+        client: {
+            render: 2,
+            setRoot: 1
+        }
+    },
     // https://atmospherejs.com/meteor/browser-policy
     "BrowserPolicy": {
         server: {
@@ -135,15 +154,65 @@ module.exports.predefs = {
             register: 2
         }
     },
+    // http://docs.meteor.com/api/check.html
+    "check": {
+        lib: {
+            __apply__: 2
+        }
+    },
     "DDP": {
         lib: {
             connect: 1
+        }
+    },
+    // https://github.com/kadirahq/meteor-dochead
+    "DocHead": {
+        client: {
+            loadScript: 3
+        },
+        lib: {
+            addMeta: 1,
+            addLdJsonScript: 1,
+            addLink: 1,
+            getTitle: 0,
+            removeDocHeadAddedTags: 0,
+            setTitle: 1
+        }
+    },
+    // https://github.com/kadirahq/flow-router
+    "FlowRouter": {
+        lib: {
+            current: 0,
+            getParam: 1,
+            getRouteName: 0,
+            getQueryParam: 1,
+            go: 3,
+            group: 1,
+            initialize: 0,
+            onRouteRegister: 1,
+            path: 3,
+            reload: 0,
+            route: 2,
+            setParams: 1,
+            setQueryParams: 1,
+            triggers: -1,
+            url: 3,
+            wait: 0,
+            watchPathChange: 0,
+            withReplaceState: 1
         }
     },
     // https://nodejs.org/api/fs.html
     "Fs": {
         server: {
 
+        }
+    },
+    // https://github.com/percolatestudio/meteor-google-api/
+    "GoogleApi": {
+        lib: {
+            get: 3,
+            post: 2
         }
     },
     "HTTP": {
@@ -155,11 +224,40 @@ module.exports.predefs = {
             put: 3
         }
     },
+    // https://github.com/Konecty/meteor-mongo-counter/
+    "decrementCounter": {
+        server: {
+            __apply__: 3
+        }
+    },
+    "incrementCounter": {
+        server: {
+            __apply__: 3
+        }
+    },
+    "setCounter": {
+        server: {
+            __apply__: 3
+        }
+    },
     "Logger": {
         lib: {
             setLevel: 1,
             setLevels: 1,
             listener: -1
+        }
+    },
+    // http://docs.meteor.com/api/check.html
+    "Match": {
+        lib: {
+            test: 2,
+            Any: -1,
+            Integer: -1,
+            Maybe: 1,
+            ObjectIncluding: 1,
+            OneOf: 10000,
+            Optional: 1,
+            Where: 1
         }
     },
     "Meteor": {
@@ -200,6 +298,26 @@ module.exports.predefs = {
             publish: 2
         }
     },
+    // https://github.com/meteor/mobile-packages/blob/master/packages/mdg:camera/README.md
+    "MeteorCamera": {
+        client: {
+            getPicture: 2
+        }
+    },
+    // http://momentjs.com/docs/
+    "moment": {
+        lib: {
+            __apply__: 4,
+            defineLocale: 2,
+            duration: 2,
+            invalid: 1,
+            locale: 2,
+            normalizeUnits: 1,
+            now: -1,
+            updateLocale: 2,
+            relativeTimeThreshold: 2
+        }
+    },
     "Npm": {
         server: {
             require: 1
@@ -217,6 +335,27 @@ module.exports.predefs = {
             registerService: 4,
             retrieveCredential: 2,
             sealSecret: 1
+        }
+    },
+    // https://github.com/meteorhacks/picker
+    "Picker": {
+        server: {
+            filter: 1,
+            middleware: 1,
+            route: 2
+        }
+    },
+    // https://github.com/meteor/promise
+    "Promise": {
+        lib: {
+            all: 1,
+            async: 2,
+            await: 1,
+            awaitAll: 1,
+            asyncApply: 4,
+            race: 1,
+            reject: 1,
+            resolve: 1,
         }
     },
     // docs.meteor.com
@@ -261,6 +400,12 @@ module.exports.predefs = {
             set: 2,
             setDefault: 2
 
+        }
+    },
+    // https://github.com/francocatena/meteor-status
+    "Status": {
+        client: {
+            setTemplate: 2
         }
     },
     // https://github.com/TAPevents/tap-i18n/
@@ -499,7 +644,8 @@ module.exports.getPredefs = function(decls) {
 
         function addPredef(decls, predefDecls) {
             _.each(predefDecls, function(arity, name) {
-                var ident = globName + "." + name;
+                var ident = globName +
+                    ((name === "__apply__") ? "" : ("." + name));
                 if (!decls[ident]) {
                     decls[ident] = {
                         loc: "<<" + globName + ">>",
