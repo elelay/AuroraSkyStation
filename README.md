@@ -71,3 +71,10 @@ for every package, to be sure that it only depends on packages it uses.
  - *ref-domain*
 
  - *ref-undefined*
+
+## License
+
+Aurore is provided under the [AGPL-3.0](https://www.gnu.org/licenses/agpl-3.0.html).
+
+As a (hopefully) temporary workaround, it includes a [modified version of eslevels](https://github.com/elelay/eslevels/blob/f243e15d3c4031c66ff3a27ed51f9a075bad1f63/eslevels.js),
+copyright 2013 Alexander (Sacha) Mazurov, under the BSD license).

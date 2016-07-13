@@ -2,7 +2,7 @@
 var Esq = require("esquery");
 var Esrecurse = require("esrecurse");
 var Esprima = require("esprima");
-var Eslevels = require("eslevels");
+var Eslevels = require("./eslevels");
 var Fs = require("fs");
 var Path = require("path");
 var Util = require("util");
@@ -44,7 +44,8 @@ var curDir;
 
 var parseOptions = {
     loc: true,
-    range: true
+    range: true,
+    sourceType: "module"
 };
 
 function addAllFns(decls, loc, name, fns) {
@@ -327,7 +328,11 @@ function getDeclsRefsOneFile(file, type, all, globals) {
     if (verbose) console.log("reading " + file);
     var ast = Esprima.parse(Fs.readFileSync(file), parseOptions);
     var levels = Eslevels.levels(ast, {
-        mode: "mini"
+        mode: "mini",
+        escopeOpts: {
+            sourceType: "module",
+            ecmaVersion: 6
+        }
     });
 
     var levelsDict = {};
