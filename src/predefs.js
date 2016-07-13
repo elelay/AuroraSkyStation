@@ -24,12 +24,6 @@ module.exports.predefPrototypes = {
         "catch": 1,
         then: 2
     },
-    // https://github.com/lablancas/twitter
-    "Twitter": {
-        getAsync: 4,
-        postAsync: 4,
-        streamAsync: 4
-    },
     // Tracker.Dependency functions, from docs.meteor.com
     "Tracker.Dependency": {
         client: {
@@ -459,6 +453,14 @@ module.exports.predefs = {
         },
         lib: {
             autorun: 2
+        }
+    },
+    // https://github.com/lablancas/twitter
+    "Twitter": {
+        server: {
+            getAsync: 4,
+            postAsync: 4,
+            streamAsync: 4
         }
     },
     // https://github.com/percolatestudio/publish-counts
