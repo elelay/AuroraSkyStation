@@ -61,12 +61,12 @@ function addAllFns(decls, loc, name, fns) {
     });
 }
 
-function getMemberFirstLevels(memberExpr) {
+function getMemberFirstLevels(file, memberExpr) {
     if (memberExpr.type === "Identifier") {
         return memberExpr.name;
     } else {
         if (memberExpr.object.type === "MemberExpression") {
-            return getMemberFirstLevels(memberExpr.object) + "." + memberExpr.property.name;
+            return getMemberFirstLevels(file, memberExpr.object) + "." + memberExpr.property.name;
         } else if (memberExpr.object.type === "Identifier") {
             return memberExpr.object.name + "." + memberExpr.property.name;
         } else if (memberExpr.object.type === "ThisExpression") {
@@ -74,7 +74,7 @@ function getMemberFirstLevels(memberExpr) {
         } else if (memberExpr.object.type === "CallExpression") {
             return "";
         } else {
-            console.error("E: unexpected identifier:", memberExpr.loc.file, memberExpr);
+            console.error("E: unexpected identifier:", file, memberExpr);
             process.exit(1);
         }
     }
@@ -106,7 +106,7 @@ function addDeclsForName(file, loc, name, value, decls) {
         if (debug) console.log(loc, "found decl", name + "(" + arity + ")");
     } else if (value.type === "NewExpression" &&
         (value.callee.type === "MemberExpression" || value.callee.type === "Identifier")) {
-        var typ = getMemberFirstLevels(value.callee);
+        var typ = getMemberFirstLevels(file, value.callee);
         if (debug) console.log(loc, "found decl", name, "= new", typ);
         if (Predefs.predefPrototypes[typ]) {
             addAllFns(decls, loc, name, Predefs.predefPrototypes[typ]);
@@ -157,7 +157,7 @@ function getDecls(file, ast, globals, type, all) {
     var visitor = new Esrecurse.Visitor({
         AssignmentExpression: function(p) {
             if (isInterestingIdentifier(globals, p.left, 2)) { // limit decls to 2 levels
-                var name = getMemberFirstLevels(p.left);
+                var name = getMemberFirstLevels(file, p.left);
                 var loc = file + ":" + p.loc.start.line;
 
                 addDeclsForName(file, loc, name, p.right, decls);
@@ -176,16 +176,16 @@ function isWhereServer(p) {
         });
 }
 
-function testIsClientServer(pTest) {
+function testIsClientServer(file, pTest) {
     if (pTest.type === "MemberExpression") {
         var test = {
             not: false
         };
-        test.mem = getMemberFirstLevels(pTest);
+        test.mem = getMemberFirstLevels(file, pTest);
         test.server = (test.mem === "Meteor.isServer");
         test.client = (test.mem === "Meteor.isClient") || (test.mem === "this.isSimulation");
     } else {
-        var test = testIsClientServer(pTest.argument);
+        var test = testIsClientServer(file, pTest.argument);
         test.not = true;
         test.mem = "!" + test.mem;
     }
@@ -208,7 +208,7 @@ function getRefs(file, ast, levels, globals, type, all) {
         if ((p.test.type === "MemberExpression") ||
             (p.test.type === "UnaryExpression" && p.test.operator === "!" &&
                 p.test.argument.type === "MemberExpression")) {
-            var test = testIsClientServer(p.test);
+            var test = testIsClientServer(file, p.test);
             if (test.client || test.server) {
 
                 var testServer = test.not ? !test.server : test.server;
@@ -243,7 +243,7 @@ function getRefs(file, ast, levels, globals, type, all) {
 
     DerivedVisitor.prototype.tryMemberExpression = function(p, arity) {
         if (isInterestingIdentifier(globals, p, 0)) { // no level limit for refs
-            var name = getMemberFirstLevels(p);
+            var name = getMemberFirstLevels(file, p);
             var loc = file + ":" + p.loc.start.line;
 
             var lvl = levels[p.range[0]];
@@ -274,7 +274,7 @@ function getRefs(file, ast, levels, globals, type, all) {
             var arity = p.arguments.length;
             var notVisited = true;
             if (inLib && isInterestingIdentifier(globals, p.callee, 0)) {
-                var name = getMemberFirstLevels(p.callee);
+                var name = getMemberFirstLevels(file, p.callee);
                 var isRoute = name === "Router.route";
                 var isController = name === "RouteController.extend";
                 var isAccountsConfigure = name === "AccountsTemplates.configure";
