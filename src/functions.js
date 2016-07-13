@@ -360,7 +360,7 @@ function getDeclsRefsOneFile(file, type, all, globals) {
 
 
 
-var endsJS = /\.js$/;
+var endsJS = /^(?!.*min\.js$).*\.js$/; // ignore minified files
 var endsHTML = /\.html$/;
 
 function getDeclsRefs(all, globals) {
